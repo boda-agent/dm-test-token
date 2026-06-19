@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { BrowserProvider, Contract, formatEther, parseEther, JsonRpcSigner } from 'ethers'
 import './App.css'
+import Docs from './Docs.jsx'
 
 // ABI для DMUSDT
 const TOKEN_ABI = [
@@ -23,6 +24,7 @@ const NETWORK_CONFIG = {
 }
 
 export default function App() {
+  const [page, setPage] = useState('main')
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
   const [account, setAccount] = useState(null)
@@ -340,12 +342,21 @@ export default function App() {
 
   const shortAddr = account ? `${account.slice(0, 6)}...${account.slice(-4)}` : ''
 
+  if (page !== 'main') {
+    return <Docs onBack={() => setPage('main')} />
+  }
+
   return (
     <div className="app">
       {/* Hero */}
       <header className="hero">
         <div className="glow" />
-        <h1 className="title">💎 DMUSDT</h1>
+        <div className="hero-top">
+          <h1 className="title">💎 DMUSDT</h1>
+          <button className="btn btn-docs" onClick={() => setPage('docs')}>
+            📄 Документация
+          </button>
+        </div>
         <p className="subtitle">Mint, Send & Add to MetaMask</p>
       </header>
 
