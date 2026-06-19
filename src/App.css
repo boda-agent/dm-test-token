@@ -200,6 +200,90 @@
   margin-bottom: 20px;
 }
 
+/* --- Этапы прогресса --- */
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+
+.progress-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  position: relative;
+}
+
+.progress-stage::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: #2a2a3a;
+  z-index: 0;
+}
+
+.progress-stage:last-child::after {
+  display: none;
+}
+
+.progress-stage.active::after {
+  background: linear-gradient(90deg, #00e676, #00bcd4);
+}
+
+.progress-stage.done::after {
+  background: #00e676;
+}
+
+.stage-dot {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background: #1e1e2a;
+  color: #555;
+  transition: all 0.3s ease;
+}
+
+.progress-stage.active .stage-dot {
+  background: #00e676;
+  color: #000;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
+}
+
+.progress-stage.done .stage-dot {
+  background: #00e676;
+  color: #000;
+}
+
+.stage-label {
+  font-size: 0.7rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.progress-stage.active .stage-label {
+  color: #00e676;
+}
+
+.progress-stage.done .stage-label {
+  color: #888;
+}
+
 .progress-track {
   width: 100%;
   height: 8px;

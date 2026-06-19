@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { BrowserProvider, Contract, formatEther, parseEther, JsonRpcSigner } from 'ethers'
 import './App.css'
 
@@ -12,6 +12,7 @@ const TOKEN_ABI = [
   'function mint() external',
   'function transfer(address to, uint256 amount) returns (bool)',
   'function tokenInfo() view returns (string name, string symbol, uint8 decimals)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
 ]
 
 const NETWORK_CONFIG = {
@@ -31,12 +32,20 @@ export default function App() {
   const [ethBalance, setEthBalance] = useState(null)
   const [loading, setLoading] = useState(false)
   const [txStatus, setTxStatus] = useState(null)
-  const [progress, setProgress] = useState(0)
   const progressRef = useRef(null)
 
   // Send form
   const [sendTo, setSendTo] = useState('')
   const [sendAmount, setSendAmount] = useState('')
+
+  // TX stages
+  const TX_STAGES = useMemo(() => [
+    { key: 'pending', label: '⏳ Pending', percent: 20 },
+    { key: 'confirmed', label: '✅ Confirmed', percent: 70 },
+    { key: 'success', label: '🎉 Success', percent: 100 },
+  ], [])
+  const [currentStage, setCurrentStage] = useState(null)
+  const [stageIndex, setStageIndex] = useState(0)
 
   const contractAddress = null // будет загружен из JSON
 
@@ -116,24 +125,63 @@ export default function App() {
     }
   }
 
+  // Утилита: запустить прогресс с этапами
+  const startProgress = () => {
+    setStageIndex(0)
+    setCurrentStage(TX_STAGES[0])
+    clearInterval(progressRef.current)
+    progressRef.current = setInterval(() => {
+      setStageIndex(prev => {
+        const next = prev + 1
+        if (next < TX_STAGES.length) {
+          setCurrentStage(TX_STAGES[next])
+        }
+        clearInterval(progressRef.current)
+        return Math.min(next, TX_STAGES.length - 1)
+      })
+    }, 12000) // ~12 сек на этап
+  }
+
+  const completeProgress = () => {
+    clearInterval(progressRef.current)
+    setStageIndex(TX_STAGES.length - 1)
+    setCurrentStage(TX_STAGES[TX_STAGES.length - 1])
+    setTimeout(() => {
+      setCurrentStage(null)
+      setStageIndex(0)
+    }, 3000)
+  }
+
+  const failProgress = () => {
+    clearInterval(progressRef.current)
+    setCurrentStage(null)
+    setStageIndex(0)
+  }
+
   // MINT
   const mintTokens = async () => {
     if (!contract) return
     try {
       setLoading(true)
-      setTxStatus('⏳ Минтим токены...')
+      setTxStatus(null)
+      startProgress()
 
+      setTxStatus('⏳ Отправка транзакции минта...')
       const tx = await contract.mint()
-      setTxStatus('⏳ Транзакция отправлена. Ждем подтверждения...')
+
+      setTxStatus('⏳ Транзакция отправлена. Ожидание подтверждения...')
+      // Ждём первый блок
       await tx.wait()
 
-      setTxStatus('✅ Токены наминчены! Обновляем баланс...')
+      setTxStatus('✅ Транзакция подтверждена! Обновляем баланс...')
       const bal = await contract.balanceOf(account)
       setBalance(formatEther(bal))
       setTxStatus('✅ Успешно! +1000 DMUSDT на твой кошелек')
+      completeProgress()
     } catch (err) {
       console.error(err)
       setTxStatus('❌ Ошибка минта: ' + (err.message || err))
+      failProgress()
     } finally {
       setLoading(false)
     }
@@ -179,10 +227,13 @@ export default function App() {
     }
     try {
       setLoading(true)
-      setTxStatus('⏳ Отправляем токены...')
+      setTxStatus(null)
+      startProgress()
 
+      setTxStatus('⏳ Отправляем токены...')
       const tx = await contract.transfer(sendTo, parseEther(sendAmount))
-      setTxStatus('⏳ Транзакция отправлена. Ждем подтверждения...')
+
+      setTxStatus('⏳ Транзакция отправлена. Ожидание подтверждения...')
       await tx.wait()
 
       setTxStatus(`✅ ${sendAmount} DMUSDT отправлено на ${sendTo.slice(0, 6)}...${sendTo.slice(-4)}`)
@@ -192,15 +243,17 @@ export default function App() {
 
       setSendTo('')
       setSendAmount('')
+      completeProgress()
     } catch (err) {
       console.error(err)
       setTxStatus('❌ Ошибка отправки: ' + (err.message || err))
+      failProgress()
     } finally {
       setLoading(false)
     }
   }
 
-  // Claim & Mint с прогрессом
+  // Claim & Mint (прогресс теперь через TX_STAGES)
   const claimAndMint = async () => {
     if (!account) {
       setTxStatus('⚠️ Сначала подключи кошелек')
@@ -208,17 +261,10 @@ export default function App() {
     }
     try {
       setLoading(true)
-      setProgress(0)
+      setTxStatus(null)
+      startProgress()
+
       setTxStatus('⏳ Запуск транзакции...')
-
-      // Анимация прогресс-бара
-      let p = 0
-      clearInterval(progressRef.current)
-      progressRef.current = setInterval(() => {
-        p += 3
-        if (p <= 90) setProgress(p)
-      }, 400)
-
       const resp = await fetch('/api/claim-mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,13 +273,10 @@ export default function App() {
 
       const data = await resp.json()
 
-      clearInterval(progressRef.current)
-
       if (!resp.ok) {
         throw new Error(data.error || 'Ошибка сервера')
       }
 
-      setProgress(100)
       setTxStatus(`✅ Получено ${data.ethAmount} SepoliaETH + ${data.tokenAmount} DMUSDT!`)
 
       if (contract) {
@@ -243,12 +286,11 @@ export default function App() {
         setEthBalance(formatEther(eth))
       }
 
-      setTimeout(() => setProgress(0), 3000)
+      completeProgress()
     } catch (err) {
-      clearInterval(progressRef.current)
-      setProgress(0)
       console.error(err)
       setTxStatus('❌ ' + (err.message || err))
+      failProgress()
     } finally {
       setLoading(false)
     }
@@ -395,15 +437,33 @@ export default function App() {
             </section>
           )}
 
-          {/* Loader / Progress */}
-          {loading && (
+          {/* Loader / Progress с этапами */}
+          {loading && currentStage && (
             <div className="progress-wrapper">
+              {/* Этапы прогресса */}
+              <div className="progress-stages">
+                {TX_STAGES.map((stage, i) => (
+                  <div
+                    key={stage.key}
+                    className={`progress-stage ${stageIndex >= i ? 'active' : ''} ${stageIndex > i ? 'done' : ''}`}
+                  >
+                    <div className="stage-dot">
+                      {stageIndex > i ? '✓' : stageIndex === i ? '●' : '○'}
+                    </div>
+                    <span className="stage-label">{stage.label.split(' ')[1] || stage.label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Прогресс-бар */}
               <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                <div
+                  className="progress-fill"
+                  style={{ width: `${TX_STAGES[stageIndex]?.percent || 0}%` }}
+                ></div>
               </div>
               <div className="progress-info">
                 <div className="spinner"></div>
-                <span>⏳ Транзакция занимает ~12-15 секунд (ждем подтверждение блока)</span>
+                <span>⏳ Транзакция занимает 20-60 секунд. Пожалуйста, подожди.</span>
               </div>
             </div>
           )}
