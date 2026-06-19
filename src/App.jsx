@@ -15,9 +15,9 @@ const TOKEN_ABI = [
 ]
 
 const NETWORK_CONFIG = {
-  chainId: '0x7a69',   // 31337 — Hardhat
-  chainName: 'Hardhat Local',
-  rpcUrls: ['http://127.0.0.1:8545'],
+  chainId: '0xaa36a7',  // 11155111 — Sepolia
+  chainName: 'Sepolia Testnet',
+  rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka'],
   nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
 }
 
@@ -325,7 +325,7 @@ export default function App() {
             <section className="card action-card">
               <h2>⚠️ Контракт не найден</h2>
               <p className="desc">
-                Запусти Hardhat node и задеплой контракт, затем обнови страницу.
+                Контракт еще не задеплоен. Обнови страницу после деплоя.
               </p>
             </section>
           )}
@@ -346,27 +346,29 @@ export default function App() {
         <div className="step">
           <div className="step-num">1</div>
           <div>
-            <strong>Установи Hardhat и запусти локальную ноду</strong>
-            <pre className="code-block">npm run chain</pre>
-            <span className="hint">Запустит локальный Ethereum-ноду на порту 8545</span>
+            <strong>Добавь Sepolia Testnet в MetaMask</strong>
+            <pre className="code-block">{'{\n'}  "Network Name": "Sepolia Testnet",{'\n'}  "RPC URL": "https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka",{'\n'}  "Chain ID": 11155111,{'\n'}  "Currency Symbol": "ETH"{'\n}'}</pre>
+            <span className="hint">MetaMask → Settings → Networks → Add Network</span>
           </div>
         </div>
 
         <div className="step">
           <div className="step-num">2</div>
           <div>
-            <strong>Задеплой контракт</strong>
-            <pre className="code-block">npm run deploy</pre>
-            <span className="hint">Скомпилирует и загрузит DMUSDT на локальную ноду</span>
+            <strong>Импортируй тестовый аккаунт</strong>
+            <span className="hint">
+              Приватный ключ: <code>0x1cd9013a3a4deb16158293a549fa554515eb6be71402d5486baf0727b35b442e</code>
+              (на этом кошельке уже есть Sepolia ETH и задеплоен контракт)
+            </span>
           </div>
         </div>
 
         <div className="step">
           <div className="step-num">3</div>
           <div>
-            <strong>Скопируй приватные ключи из Hardhat</strong>
+            <strong>Импортируй второй аккаунт (для теста)</strong>
             <span className="hint">
-              При запуске ноды Hardhat выдает тестовые аккаунты с ETH. Скопируй приватный ключ любого в MetaMask → Import Account.
+              Открой другой браузер или используй Incognito, создай новый MetaMask кошелек и получи Sepolia ETH на https://sepolia-faucet.pk910.de чтобы платить за газ при минте
             </span>
           </div>
         </div>
@@ -374,64 +376,14 @@ export default function App() {
         <div className="step">
           <div className="step-num">4</div>
           <div>
-            <strong>Добавь Hardhat Network в MetaMask</strong>
-            <pre className="code-block">
-              Network Name: Hardhat Local{'\n'}
-              RPC URL: http://127.0.0.1:8545{'\n'}
-              Chain ID: 31337{'\n'}
-              Currency Symbol: ETH
-            </pre>
-            <span className="hint">MetaMask → Settings → Networks → Add Network</span>
-          </div>
-        </div>
-
-        <div className="step">
-          <div className="step-num">5</div>
-          <div>
-            <strong>Настрой ngrok (чтобы показать друзьям)</strong>
-            <pre className="code-block">
-              # Терминал 1 — нода{'\n'}
-              npm run chain{'\n'}
-              {'\n'}
-              # Терминал 2 — деплой{'\n'}
-              npm run deploy{'\n'}
-              {'\n'}
-              # Терминал 2 — фронт{'\n'}
-              npm run dev{'\n'}
-              {'\n'}
-              # Терминал 3 — ngrok для фронта{'\n'}
-              ngrok http 5173{'\n'}
-              {'\n'}
-              # Терминал 4 — ngrok для ноды (чтоб MetaMask мог подключиться){'\n'}
-              ngrok http 8545
-            </pre>
-            <span className="hint">
-              После ngrok замени RPC URL в MetaMask на ngrok-адрес и обнови фронт
-            </span>
-          </div>
-        </div>
-
-        <div className="step">
-          <div className="step-num">6</div>
-          <div>
             <strong>Открой сайт и пользуйся</strong>
             <ul className="feature-list">
-              <li>🟢 Connect Wallet — подключи MetaMask</li>
+              <li>🟢 Connect Wallet — подключи MetaMask (сеть Sepolia)</li>
               <li>🪙 Mint — получи 1000 DMUSDT</li>
               <li>📥 Add to MetaMask — токен появится в кошельке</li>
               <li>✈️ Send — отправь другу</li>
               <li>🔄 Друг делает Mint → у него тоже DMUSDT → отправляет обратно</li>
             </ul>
-          </div>
-        </div>
-
-        <div className="step">
-          <div className="step-num">7</div>
-          <div>
-            <strong>🎉 Гоняй токены между кошельками</strong>
-            <span className="hint">
-              Открой сайт на двух вкладках с разными аккаунтами (MetaMask → Switch Account). Mint на обоих и отправляй друг другу. Всё работает локально.
-            </span>
           </div>
         </div>
       </section>
