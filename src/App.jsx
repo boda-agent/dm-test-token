@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { BrowserProvider, Contract, formatEther, parseEther, JsonRpcSigner } from 'ethers'
 import './App.css'
 
@@ -31,6 +31,8 @@ export default function App() {
   const [ethBalance, setEthBalance] = useState(null)
   const [loading, setLoading] = useState(false)
   const [txStatus, setTxStatus] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef(null)
 
   // Send form
   const [sendTo, setSendTo] = useState('')
@@ -198,7 +200,7 @@ export default function App() {
     }
   }
 
-  // Claim & Mint одним кликом (бэкенд платит газ)
+  // Claim & Mint с прогрессом
   const claimAndMint = async () => {
     if (!account) {
       setTxStatus('⚠️ Сначала подключи кошелек')
@@ -206,7 +208,16 @@ export default function App() {
     }
     try {
       setLoading(true)
-      setTxStatus('⏳ Отправляем ETH и минтим токены...')
+      setProgress(0)
+      setTxStatus('⏳ Запуск транзакции...')
+
+      // Анимация прогресс-бара
+      let p = 0
+      clearInterval(progressRef.current)
+      progressRef.current = setInterval(() => {
+        p += 3
+        if (p <= 90) setProgress(p)
+      }, 400)
 
       const resp = await fetch('/api/claim-mint', {
         method: 'POST',
@@ -216,20 +227,26 @@ export default function App() {
 
       const data = await resp.json()
 
+      clearInterval(progressRef.current)
+
       if (!resp.ok) {
         throw new Error(data.error || 'Ошибка сервера')
       }
 
+      setProgress(100)
       setTxStatus(`✅ Получено ${data.ethAmount} SepoliaETH + ${data.tokenAmount} DMUSDT!`)
 
-      // Обновить баланс токенов
       if (contract) {
         const bal = await contract.balanceOf(account)
         setBalance(formatEther(bal))
         const eth = await provider.getBalance(account)
         setEthBalance(formatEther(eth))
       }
+
+      setTimeout(() => setProgress(0), 3000)
     } catch (err) {
+      clearInterval(progressRef.current)
+      setProgress(0)
       console.error(err)
       setTxStatus('❌ ' + (err.message || err))
     } finally {
@@ -376,6 +393,19 @@ export default function App() {
                 Контракт еще не задеплоен. Обнови страницу после деплоя.
               </p>
             </section>
+          )}
+
+          {/* Loader / Progress */}
+          {loading && (
+            <div className="progress-wrapper">
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+              </div>
+              <div className="progress-info">
+                <div className="spinner"></div>
+                <span>⏳ Транзакция занимает ~12-15 секунд (ждем подтверждение блока)</span>
+              </div>
+            </div>
           )}
 
           {/* Status */}
