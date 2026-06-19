@@ -15,7 +15,7 @@ async function main() {
   console.log('Баланс деплоера:', await token.balanceOf(deployer.address))
 
   // Сохраняем адрес для фронтенда
-  const dest = path.join(__dirname, '..', 'src', 'contract-address.json')
+  const dest = path.join(__dirname, '..', 'public', 'contract-address.json')
   fs.writeFileSync(dest, JSON.stringify({ address: addr }, null, 2))
   console.log('Адрес сохранен в', dest)
 }
