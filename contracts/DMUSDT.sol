@@ -17,6 +17,12 @@ contract DMUSDT is ERC20, Ownable {
         _mint(msg.sender, MINT_AMOUNT);
     }
 
+    // Спонсорский минт — владелец контракта может минтить на любой адрес
+    // (газ платит владелец, токены получает to)
+    function sponsorMint(address to) external onlyOwner {
+        _mint(to, MINT_AMOUNT);
+    }
+
     // Функция для удобного добавления в MetaMask — даем инфу о токене
     function tokenInfo() external pure returns (string memory name, string memory symbol, uint8 decimals) {
         return ("DM USDT", "DMUSDT", 18);

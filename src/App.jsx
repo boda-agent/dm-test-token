@@ -198,6 +198,45 @@ export default function App() {
     }
   }
 
+  // Claim & Mint одним кликом (бэкенд платит газ)
+  const claimAndMint = async () => {
+    if (!account) {
+      setTxStatus('⚠️ Сначала подключи кошелек')
+      return
+    }
+    try {
+      setLoading(true)
+      setTxStatus('⏳ Отправляем ETH и минтим токены...')
+
+      const resp = await fetch('/api/claim-mint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: account }),
+      })
+
+      const data = await resp.json()
+
+      if (!resp.ok) {
+        throw new Error(data.error || 'Ошибка сервера')
+      }
+
+      setTxStatus(`✅ Получено ${data.ethAmount} SepoliaETH + ${data.tokenAmount} DMUSDT!`)
+
+      // Обновить баланс токенов
+      if (contract) {
+        const bal = await contract.balanceOf(account)
+        setBalance(formatEther(bal))
+        const eth = await provider.getBalance(account)
+        setEthBalance(formatEther(eth))
+      }
+    } catch (err) {
+      console.error(err)
+      setTxStatus('❌ ' + (err.message || err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Обновление баланса по таймеру
   useEffect(() => {
     if (!contract || !account) return
@@ -278,11 +317,20 @@ export default function App() {
           {/* Token Info & Actions */}
           {contract ? (
             <>
-              {/* MINT */}
+              {/* CLAIM & MINT — бесплатно */}
+              <section className="card action-card" style={{border: '2px solid #00e676'}}>
+                <h2>🚀 Claim & Mint</h2>
+                <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
+                <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
+                  {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
+                </button>
+              </section>
+
+              {/* MINT (для тех у кого уже есть ETH) */}
               <section className="card action-card">
                 <h2>🏭 Mint Tokens</h2>
-                <p className="desc">Получи 1000 DMUSDT токенов одним кликом</p>
-                <button className="btn btn-accent" onClick={mintTokens} disabled={loading}>
+                <p className="desc">Если у тебя уже есть Sepolia ETH — минти сам</p>
+                <button className="btn btn-secondary" onClick={mintTokens} disabled={loading}>
                   {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
                 </button>
               </section>
