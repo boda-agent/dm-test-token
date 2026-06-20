@@ -100,6 +100,7 @@ export default function App() {
   const [currentStage, setCurrentStage] = useState(null)
   const [stageIndex, setStageIndex] = useState(0)
   const [activeAction, setActiveAction] = useState(null)
+  const [setupStep, setSetupStep] = useState(-1)
 
   const contractAddress = null // будет загружен из JSON
 
@@ -481,47 +482,198 @@ export default function App() {
           {/* Token Info & Actions */}
           {contract ? (
             <>
-              {/* CLAIM — показываем только если ETH мало или нет */}
+              {/* ONBOARDING: пошаговая настройка кошелька */}
               {(!ethBalance || Number(ethBalance) < 0.003) && (
-                Number(ethBalance) === 0 || !ethBalance ? (
-                  <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
-                    <h2>🚀 Claim ETH + Mint</h2>
-                    <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
-                    <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
-                      {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
+                <section className={`card action-card ${setupStep >= 0 ? 'card-active' : ''}`} style={{border: '2px solid #00bcd4'}}>
+                  <h2>🚀 Настройка кошелька</h2>
+                  <p className="desc">4 простых шага для начала работы с DMUSDT</p>
+
+                  {setupStep < 0 && (
+                    <button className="btn btn-accent" onClick={() => setSetupStep(0)}>
+                      🚀 Начать настройку
                     </button>
-                    {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
-                  </section>
-                ) : (
-                  <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '1px solid #ffa726'}}>
-                    <h2>⛽ Claim Sepolia ETH</h2>
-                    <p className="desc">На балансе мало ETH для газа. Пополни бесплатно</p>
-                    <button className="btn btn-accent" onClick={claimEth} disabled={loading}>
-                      {loading ? '⏳' : '⛽ Claim 0.02 SepoliaETH'}
-                    </button>
-                    {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
-                  </section>
-                )
+                  )}
+
+                  {setupStep >= 0 && (
+                    <div className="setup-steps">
+                      {/* Шаг 1: Сеть */}
+                      <div className={`setup-step ${setupStep > 0 ? 'done' : setupStep === 0 ? 'active' : ''}`}>
+                        <div className="setup-step-icon">{setupStep > 0 ? '✓' : '1'}</div>
+                        <div className="setup-step-body">
+                          <strong>Добавить Sepolia</strong>
+                          <span>{setupStep > 0 ? '✅ Сеть добавлена' : 'Переключись на Sepolia Testnet в MetaMask'}</span>
+                        </div>
+                        {setupStep === 0 && (
+                          <div className="setup-step-action">
+                            <button className="btn btn-small btn-primary" onClick={async () => {
+                              try {
+                                setSetupStep(0)
+                                setTxStatus('⏳ Переключаем сеть...')
+                                await window.ethereum.request({
+                                  method: 'wallet_switchEthereumChain',
+                                  params: [{ chainId: '0xaa36a7' }],
+                                })
+                                setTxStatus('✅ Сеть переключена на Sepolia')
+                                setSetupStep(1)
+                              } catch (e) {
+                                if (e.code === 4902) {
+                                  try {
+                                    await window.ethereum.request({
+                                      method: 'wallet_addEthereumChain',
+                                      params: [{
+                                        chainId: '0xaa36a7',
+                                        chainName: 'Sepolia Testnet',
+                                        rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka'],
+                                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                                      }],
+                                    })
+                                    setSetupStep(1)
+                                  } catch {}
+                                }
+                              }
+                            }} disabled={loading}>
+                              {loading ? '⏳' : '✅ Готово'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Шаг 2: Claim ETH */}
+                      <div className={`setup-step ${setupStep > 1 ? 'done' : setupStep === 1 ? 'active' : ''}`}>
+                        <div className="setup-step-icon">{setupStep > 1 ? '✓' : '2'}</div>
+                        <div className="setup-step-body">
+                          <strong>Claim Sepolia ETH</strong>
+                          <span>{setupStep > 1 ? '✅ ETH получен' : 'Получи ETH для оплаты газа'}</span>
+                        </div>
+                        {setupStep === 1 && (
+                          <button className="btn btn-small btn-accent" onClick={async () => {
+                            setLoading(true)
+                            try {
+                              const resp = await fetch('/api/claim-eth', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ address: account }),
+                              })
+                              const data = await resp.json()
+                              if (!resp.ok) throw new Error(data.error)
+                              const eth = await provider.getBalance(account)
+                              setEthBalance(formatEther(eth))
+                              setTxStatus('✅ Получено 0.02 SepoliaETH!')
+                              setSetupStep(2)
+                            } catch (e) {
+                              setTxStatus(friendlyError(e))
+                            } finally {
+                              setLoading(false)
+                            }
+                          }} disabled={loading}>
+                            {loading ? '⏳' : '⛽ Claim 0.02 ETH'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Шаг 3: Add Token */}
+                      <div className={`setup-step ${setupStep > 2 ? 'done' : setupStep === 2 ? 'active' : ''}`}>
+                        <div className="setup-step-icon">{setupStep > 2 ? '✓' : '3'}</div>
+                        <div className="setup-step-body">
+                          <strong>Добавить DMUSDT</strong>
+                          <span>{setupStep > 2 ? '✅ Токен добавлен' : 'Добавь токен в MetaMask'}</span>
+                        </div>
+                        {setupStep === 2 && (
+                          <button className="btn btn-small btn-primary" onClick={async () => {
+                            try {
+                              await window.ethereum.request({
+                                method: 'wallet_watchAsset',
+                                params: { type: 'ERC20', options: { address: contractAddress, symbol: 'DMUSDT', decimals: 18 } },
+                              })
+                              setTxStatus('✅ DMUSDT добавлен в MetaMask!')
+                              setSetupStep(3)
+                            } catch {}
+                          }}>
+                            ➕ Добавить DMUSDT
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Шаг 4: Mint */}
+                      <div className={`setup-step ${setupStep > 3 ? 'done' : setupStep === 3 ? 'active' : ''}`}>
+                        <div className="setup-step-icon">{setupStep > 3 ? '✓' : '4'}</div>
+                        <div className="setup-step-body">
+                          <strong>Mint DMUSDT</strong>
+                          <span>{setupStep > 3 ? '✅ Токены наминчены' : 'Получи 1000 DMUSDT'}</span>
+                        </div>
+                        {setupStep === 3 && (
+                          <button className="btn btn-small btn-accent" onClick={async () => {
+                            setLoading(true)
+                            try {
+                              const resp = await fetch('/api/mint', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ address: account }),
+                              })
+                              const data = await resp.json()
+                              if (!resp.ok) throw new Error(data.error)
+                              const bal = await contract.balanceOf(account)
+                              setBalance(formatEther(bal))
+                              setTxStatus('✅ Получено 1000 DMUSDT!')
+                              setSetupStep(4)
+                            } catch (e) {
+                              setTxStatus(friendlyError(e))
+                            } finally {
+                              setLoading(false)
+                            }
+                          }} disabled={loading}>
+                            {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
+                          </button>
+                        )}
+                      </div>
+
+                      {setupStep >= 4 && (
+                        <div className="setup-done">
+                          🎉 Кошелек настроен! Теперь можно отправлять токены
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {loading && currentStage && activeAction === 'setup' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                </section>
               )}
 
-              {/* MINT (для тех у кого уже есть ETH) */}
-              <section className={`card action-card ${activeAction === 'mint' ? 'card-active' : ''}`}>
-                <h2>🏭 Mint Tokens</h2>
-                <p className="desc">Если у тебя уже есть Sepolia ETH — минти сам</p>
-                <button className="btn btn-secondary" onClick={mintTokens} disabled={loading}>
-                  {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
-                </button>
-                {loading && currentStage && activeAction === 'mint' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
-              </section>
+              {/* Если ETH уже есть — показываем быстрые кнопки */}
+              {ethBalance && Number(ethBalance) >= 0.003 && (
+                <>
+                  {/* MINT */}
+                  <section className={`card action-card ${activeAction === 'mint' ? 'card-active' : ''}`}>
+                    <h2>🏭 Mint Tokens</h2>
+                    <p className="desc">Если у тебя уже есть Sepolia ETH — минти сам</p>
+                    <button className="btn btn-secondary" onClick={mintTokens} disabled={loading}>
+                      {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
+                    </button>
+                    {loading && currentStage && activeAction === 'mint' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                  </section>
 
-              {/* Add to MetaMask */}
-              <section className="card action-card">
-                <h2>📥 Add to MetaMask</h2>
-                <p className="desc">Добавь токен в кошелек, чтобы видеть баланс</p>
-                <button className="btn btn-secondary" onClick={addToMetaMask}>
-                  ➕ Add DMUSDT to Wallet
-                </button>
-              </section>
+                  {/* Add to MetaMask */}
+                  <section className="card action-card">
+                    <h2>📥 Add to MetaMask</h2>
+                    <p className="desc">Добавь токен в кошелек, чтобы видеть баланс</p>
+                    <button className="btn btn-secondary" onClick={addToMetaMask}>
+                      ➕ Add DMUSDT to Wallet
+                    </button>
+                  </section>
+                </>
+              )}
+
+              {/* Если ETH мало — показываем кнопку пополнения */}
+              {ethBalance && Number(ethBalance) > 0 && Number(ethBalance) < 0.003 && (
+                <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '1px solid #ffa726'}}>
+                  <h2>⛽ Claim Sepolia ETH</h2>
+                  <p className="desc">На балансе мало ETH для газа. Пополни бесплатно</p>
+                  <button className="btn btn-accent" onClick={claimEth} disabled={loading}>
+                    {loading ? '⏳' : '⛽ Claim 0.02 SepoliaETH'}
+                  </button>
+                  {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                </section>
+              )}
 
               {/* SEND */}
               <section className={`card action-card ${activeAction === 'send' ? 'card-active' : ''}`}>

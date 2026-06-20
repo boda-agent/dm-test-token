@@ -215,10 +215,120 @@
   color: #555;
 }
 
+/* === SETUP STEPS === */
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.setup-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #0d0d14;
+  border: 1px solid #1e1e2a;
+  border-radius: 10px;
+  opacity: 0.4;
+  transition: opacity 0.3s, border-color 0.3s;
+}
+
+.setup-step.active {
+  opacity: 1;
+  border-color: #00bcd4;
+}
+
+.setup-step.done {
+  opacity: 0.8;
+  border-color: #00e676;
+}
+
+.setup-step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.setup-step.active .setup-step-icon {
+  background: #00bcd4;
+  color: #000;
+}
+
+.setup-step.done .setup-step-icon {
+  background: #00e676;
+  color: #000;
+}
+
+.setup-step:not(.active):not(.done) .setup-step-icon {
+  background: #1e1e2a;
+  color: #555;
+}
+
+.setup-step-body {
+  flex: 1;
+}
+
+.setup-step-body strong {
+  display: block;
+  font-size: 0.85rem;
+  color: #e0e0e0;
+}
+
+.setup-step-body span {
+  font-size: 0.75rem;
+  color: #777;
+}
+
+.setup-step-action {
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-small:hover {
+  filter: brightness(1.1);
+}
+
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.setup-done {
+  text-align: center;
+  padding: 16px;
+  color: #00e676;
+  font-weight: 600;
+  font-size: 0.95rem;
+  animation: fadeUp 0.5s ease;
+}
+
 /* === PROGRESS & LOADER === */
 @keyframes slideDown {
   from { opacity: 0; max-height: 0; transform: translateY(-10px); }
   to { opacity: 1; max-height: 200px; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .progress-inline {
