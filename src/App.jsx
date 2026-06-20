@@ -71,6 +71,7 @@ export default function App() {
   )
   const [currentStage, setCurrentStage] = useState(null)
   const [stageIndex, setStageIndex] = useState(0)
+  const [activeAction, setActiveAction] = useState(null)
 
   const contractAddress = null // будет загружен из JSON
 
@@ -151,7 +152,8 @@ export default function App() {
   }
 
   // Утилита: запустить прогресс с этапами
-  const startProgress = () => {
+  const startProgress = (action) => {
+    setActiveAction(action)
     setStageIndex(0)
     setCurrentStage(TX_STAGES[0])
     clearInterval(progressRef.current)
@@ -174,6 +176,7 @@ export default function App() {
     setTimeout(() => {
       setCurrentStage(null)
       setStageIndex(0)
+      setActiveAction(null)
     }, 3000)
   }
 
@@ -181,6 +184,7 @@ export default function App() {
     clearInterval(progressRef.current)
     setCurrentStage(null)
     setStageIndex(0)
+    setActiveAction(null)
   }
 
   // MINT
@@ -189,7 +193,7 @@ export default function App() {
     try {
       setLoading(true)
       setTxStatus(null)
-      startProgress()
+      startProgress('mint')
 
       setTxStatus('⏳ Отправка транзакции минта...')
       const tx = await contract.mint()
@@ -253,7 +257,7 @@ export default function App() {
     try {
       setLoading(true)
       setTxStatus(null)
-      startProgress()
+      startProgress('send')
 
       setTxStatus('⏳ Отправляем токены...')
       const tx = await contract.transfer(sendTo, parseEther(sendAmount))
@@ -287,7 +291,7 @@ export default function App() {
     try {
       setLoading(true)
       setTxStatus(null)
-      startProgress()
+      startProgress('claim')
 
       setTxStatus('⏳ Запуск транзакции...')
       const resp = await fetch('/api/claim-mint', {
@@ -411,23 +415,23 @@ export default function App() {
           {contract ? (
             <>
               {/* CLAIM & MINT — бесплатно */}
-              <section className={`card action-card ${loading ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
+              <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
                 <h2>🚀 Claim & Mint</h2>
                 <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
                 <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
                   {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
                 </button>
-                {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
               </section>
 
               {/* MINT (для тех у кого уже есть ETH) */}
-              <section className={`card action-card ${loading ? 'card-active' : ''}`}>
+              <section className={`card action-card ${activeAction === 'mint' ? 'card-active' : ''}`}>
                 <h2>🏭 Mint Tokens</h2>
                 <p className="desc">Если у тебя уже есть Sepolia ETH — минти сам</p>
                 <button className="btn btn-secondary" onClick={mintTokens} disabled={loading}>
                   {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
                 </button>
-                {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                {loading && currentStage && activeAction === 'mint' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
               </section>
 
               {/* Add to MetaMask */}
@@ -440,7 +444,7 @@ export default function App() {
               </section>
 
               {/* SEND */}
-              <section className={`card action-card ${loading ? 'card-active' : ''}`}>
+              <section className={`card action-card ${activeAction === 'send' ? 'card-active' : ''}`}>
                 <h2>✈️ Send Tokens</h2>
                 <p className="desc">Перешли токены на другой кошелек</p>
                 <div className="send-form">
@@ -461,7 +465,7 @@ export default function App() {
                   <button className="btn btn-primary" onClick={sendTokens} disabled={loading}>
                     {loading ? '⏳' : '✈️ Send'}
                   </button>
-                  {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                  {loading && currentStage && activeAction === 'send' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
                 </div>
               </section>
             </>
