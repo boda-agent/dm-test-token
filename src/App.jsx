@@ -42,10 +42,33 @@ export default function App() {
 
   // TX stages
   const TX_STAGES = useMemo(() => [
-    { key: 'pending', label: '⏳ Pending', percent: 20 },
-    { key: 'confirmed', label: '✅ Confirmed', percent: 70 },
-    { key: 'success', label: '🎉 Success', percent: 100 },
+    { key: 'pending', label: '⏳ Отправка', percent: 20 },
+    { key: 'confirmed', label: '✅ Подтверждение', percent: 70 },
+    { key: 'success', label: '🎉 Готово', percent: 100 },
   ], [])
+
+  const ProgressBar = ({ stages, stageIndex: idx }) => (
+    <div className="progress-inline">
+      <div className="progress-stages">
+        {stages.map((stage, i) => (
+          <div
+            key={stage.key}
+            className={`progress-stage ${idx >= i ? 'active' : ''} ${idx > i ? 'done' : ''}`}
+          >
+            <div className="stage-dot">{idx > i ? '✓' : idx === i ? '●' : '○'}</div>
+            <span className="stage-label">{stage.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${stages[idx]?.percent || 0}%` }}></div>
+      </div>
+      <div className="progress-info">
+        <div className="spinner"></div>
+        <span>⏳ Транзакция занимает ~12-15 секунд</span>
+      </div>
+    </div>
+  )
   const [currentStage, setCurrentStage] = useState(null)
   const [stageIndex, setStageIndex] = useState(0)
 
@@ -388,21 +411,23 @@ export default function App() {
           {contract ? (
             <>
               {/* CLAIM & MINT — бесплатно */}
-              <section className="card action-card" style={{border: '2px solid #00e676'}}>
+              <section className={`card action-card ${loading ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
                 <h2>🚀 Claim & Mint</h2>
                 <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
                 <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
                   {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
                 </button>
+                {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
               </section>
 
               {/* MINT (для тех у кого уже есть ETH) */}
-              <section className="card action-card">
+              <section className={`card action-card ${loading ? 'card-active' : ''}`}>
                 <h2>🏭 Mint Tokens</h2>
                 <p className="desc">Если у тебя уже есть Sepolia ETH — минти сам</p>
                 <button className="btn btn-secondary" onClick={mintTokens} disabled={loading}>
                   {loading ? '⏳' : '🪙 Mint 1000 DMUSDT'}
                 </button>
+                {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
               </section>
 
               {/* Add to MetaMask */}
@@ -415,7 +440,7 @@ export default function App() {
               </section>
 
               {/* SEND */}
-              <section className="card action-card">
+              <section className={`card action-card ${loading ? 'card-active' : ''}`}>
                 <h2>✈️ Send Tokens</h2>
                 <p className="desc">Перешли токены на другой кошелек</p>
                 <div className="send-form">
@@ -436,6 +461,7 @@ export default function App() {
                   <button className="btn btn-primary" onClick={sendTokens} disabled={loading}>
                     {loading ? '⏳' : '✈️ Send'}
                   </button>
+                  {loading && currentStage && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
                 </div>
               </section>
             </>
@@ -446,37 +472,6 @@ export default function App() {
                 Контракт еще не задеплоен. Обнови страницу после деплоя.
               </p>
             </section>
-          )}
-
-          {/* Loader / Progress с этапами */}
-          {loading && currentStage && (
-            <div className="progress-wrapper">
-              {/* Этапы прогресса */}
-              <div className="progress-stages">
-                {TX_STAGES.map((stage, i) => (
-                  <div
-                    key={stage.key}
-                    className={`progress-stage ${stageIndex >= i ? 'active' : ''} ${stageIndex > i ? 'done' : ''}`}
-                  >
-                    <div className="stage-dot">
-                      {stageIndex > i ? '✓' : stageIndex === i ? '●' : '○'}
-                    </div>
-                    <span className="stage-label">{stage.label.split(' ')[1] || stage.label}</span>
-                  </div>
-                ))}
-              </div>
-              {/* Прогресс-бар */}
-              <div className="progress-track">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${TX_STAGES[stageIndex]?.percent || 0}%` }}
-                ></div>
-              </div>
-              <div className="progress-info">
-                <div className="spinner"></div>
-                <span>⏳ Транзакция занимает 20-60 секунд. Пожалуйста, подожди.</span>
-              </div>
-            </div>
           )}
 
           {/* Status */}
@@ -541,6 +536,37 @@ export default function App() {
       <footer className="footer">
         <p>Made with 💎 by Neo · 2026</p>
       </footer>
+    </div>
+  )
+}
+
+// Компонент прогресс-бара с этапами
+function ProgressBar({ stages, stageIndex }) {
+  return (
+    <div className="progress-wrapper progress-enter">
+      <div className="progress-stages">
+        {stages.map((stage, i) => (
+          <div
+            key={stage.key}
+            className={`progress-stage ${stageIndex >= i ? 'active' : ''} ${stageIndex > i ? 'done' : ''}`}
+          >
+            <div className="stage-dot">
+              {stageIndex > i ? '✓' : stageIndex === i ? '●' : '○'}
+            </div>
+            <span className="stage-label">{stage.label.split(' ')[1] || stage.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="progress-track">
+        <div
+          className="progress-fill"
+          style={{ width: `${stages[stageIndex]?.percent || 0}%` }}
+        ></div>
+      </div>
+      <div className="progress-info">
+        <div className="spinner"></div>
+        <span>⏳ Транзакция занимает 20-60 секунд. Пожалуйста, подожди.</span>
+      </div>
     </div>
   )
 }
