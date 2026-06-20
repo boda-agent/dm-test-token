@@ -378,13 +378,11 @@ export default function App() {
       {/* Hero */}
       <header className="hero">
         <div className="glow" />
-        <div className="hero-top">
-          <h1 className="title">💎 DMUSDT</h1>
-          <button className="btn btn-docs" onClick={() => setPage('docs')}>
-            📄 Документация
-          </button>
-        </div>
+        <h1 className="title">💎 DMUSDT</h1>
         <p className="subtitle">Mint, Send & Add to MetaMask</p>
+        <button className="btn btn-docs" onClick={() => setPage('docs')}>
+          📄 Документация
+        </button>
       </header>
 
       {/* Wallet Connection */}
@@ -538,7 +536,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="footer">
-        <p>Made with 💎 by Neo · 2026</p>
+        <p>DMUSDT · Sepolia Testnet</p>
       </footer>
     </div>
   )

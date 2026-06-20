@@ -13,33 +13,28 @@
   position: relative;
 }
 
-.hero-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
 .btn-docs {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: #1e1e2a;
-  color: #aaa;
-  border: 1px solid #333;
-  border-radius: 100px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 4px 12px;
+  background: transparent;
+  color: #555;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 400;
   cursor: pointer;
   transition: all 0.2s;
-  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #333;
 }
 
 .btn-docs:hover {
-  background: #2a2a3a;
-  color: #e0e0e0;
+  color: #00e676;
+  text-decoration-color: #00e676;
 }
 
 .glow {
