@@ -475,6 +475,43 @@
   to { transform: rotate(360deg); }
 }
 
+/* === Instruction Tabs === */
+.instr-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.instr-tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #2a2a3a;
+  background: #0d0d14;
+  color: #888;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.instr-tab.active {
+  background: #1e1e2a;
+  color: #e0e0e0;
+  border-color: #00bcd4;
+}
+
+.instr-tab:hover:not(.active) {
+  background: #1a1a24;
+  color: #aaa;
+}
+
+.instructions-card a {
+  color: #00bcd4;
+  text-decoration: underline;
+}
+
 /* === STATUS BAR === */
 .status-bar {
   background: #1a1a24;

@@ -102,6 +102,7 @@ export default function App() {
   const [stageIndex, setStageIndex] = useState(0)
   const [activeAction, setActiveAction] = useState(null)
   const [setupStep, setSetupStep] = useState(-1)
+  const [instrTab, setInstrTab] = useState('desktop')
 
   const contractAddress = null // будет загружен из JSON
 
@@ -732,51 +733,136 @@ export default function App() {
 
       {/* Instructions */}
       <section className="card instructions-card">
-        <h2>📖 Как это работает</h2>
+        <h2>📖 Как получить DMUSDT</h2>
 
-        <div className="step">
-          <div className="step-num">1</div>
-          <div>
-            <strong>Добавь Sepolia Testnet в MetaMask</strong>
-            <pre className="code-block">{'{\n'}  "Network Name": "Sepolia Testnet",{'\n'}  "RPC URL": "https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka",{'\n'}  "Chain ID": 11155111,{'\n'}  "Currency Symbol": "ETH"{'\n}'}</pre>
-            <span className="hint">MetaMask → Settings → Networks → Add Network</span>
-          </div>
+        <div className="instr-tabs">
+          <button className={`instr-tab ${instrTab === 'desktop' ? 'active' : ''}`} onClick={() => setInstrTab('desktop')}>
+            🖥️ Desktop
+          </button>
+          <button className={`instr-tab ${instrTab === 'mobile' ? 'active' : ''}`} onClick={() => setInstrTab('mobile')}>
+            📱 Mobile
+          </button>
         </div>
 
-        <div className="step">
-          <div className="step-num">2</div>
-          <div>
-            <strong>Импортируй тестовый аккаунт</strong>
-            <span className="hint">
-              Приватный ключ: <code>0x1cd9013a3a4deb16158293a549fa554515eb6be71402d5486baf0727b35b442e</code>
-              (на этом кошельке уже есть Sepolia ETH и задеплоен контракт)
-            </span>
-          </div>
-        </div>
+        {instrTab === 'desktop' && (
+          <>
+            <div className="step">
+              <div className="step-num">1</div>
+              <div>
+                <strong>Добавь Sepolia Testnet</strong>
+                <pre className="code-block">{'{\n'}  "Network Name": "Sepolia Testnet",{'\n'}  "RPC URL": "https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka",{'\n'}  "Chain ID": 11155111,{'\n'}  "Currency Symbol": "ETH"{'\n}'}</pre>
+                <span className="hint">MetaMask → Settings → Networks → Add Network</span>
+              </div>
+            </div>
 
-        <div className="step">
-          <div className="step-num">3</div>
-          <div>
-            <strong>Импортируй второй аккаунт (для теста)</strong>
-            <span className="hint">
-              Открой другой браузер или используй Incognito, создай новый MetaMask кошелек и получи Sepolia ETH на https://sepolia-faucet.pk910.de чтобы платить за газ при минте
-            </span>
-          </div>
-        </div>
+            <div className="step">
+              <div className="step-num">2</div>
+              <div>
+                <strong>Импортируй аккаунт</strong>
+                <span className="hint">
+                  Приватный ключ: <code>0x1cd9013a3a4deb16158293a549fa554515eb6be71402d5486baf0727b35b442e</code>
+                  (на нём уже есть Sepolia ETH и контракт)
+                </span>
+              </div>
+            </div>
 
-        <div className="step">
-          <div className="step-num">4</div>
-          <div>
-            <strong>Открой сайт и пользуйся</strong>
-            <ul className="feature-list">
-              <li>🟢 Connect Wallet — подключи MetaMask (сеть Sepolia)</li>
-              <li>🪙 Mint — получи 1000 DMUSDT</li>
-              <li>📥 Add to MetaMask — токен появится в кошельке</li>
-              <li>✈️ Send — отправь другу</li>
-              <li>🔄 Друг делает Mint → у него тоже DMUSDT → отправляет обратно</li>
-            </ul>
-          </div>
-        </div>
+            <div className="step">
+              <div className="step-num">3</div>
+              <div>
+                <strong>Открой сайт → Connect Wallet</strong>
+                <span className="hint">Нажми 🚀 Настройка кошелька → пройди 4 шага</span>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">4</div>
+              <div>
+                <strong>Готово!</strong>
+                <ul className="feature-list">
+                  <li>🪙 Mint — получи 1000 DMUSDT</li>
+                  <li>📥 Add to MetaMask — токен появится в кошельке</li>
+                  <li>✈️ Send — отправь другу</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
+
+        {instrTab === 'mobile' && (
+          <>
+            <div className="step">
+              <div className="step-num">1</div>
+              <div>
+                <strong>Установи MetaMask на телефон</strong>
+                <span className="hint">
+                  iOS: <a href="https://apps.apple.com/app/metamask/id1438144202" target="_blank">App Store</a>
+                  · Android: <a href="https://play.google.com/store/apps/details?id=io.metamask" target="_blank">Google Play</a>
+                </span>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">2</div>
+              <div>
+                <strong>Добавь Sepolia Testnet</strong>
+                <span className="hint">
+                  MetaMask (моб.) → иконка ☰ (слева вверху) → Settings → Networks →<br />
+                  Add Network → вручную:
+                </span>
+                <pre className="code-block">Network: Sepolia Testnet{'\n'}RPC: https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka{'\n'}Chain ID: 11155111{'\n'}Symbol: ETH</pre>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">3</div>
+              <div>
+                <strong>Импортируй аккаунт</strong>
+                <span className="hint">
+                  ☰ → Account → Import Account → вставь ключ ниже
+                </span>
+                <pre className="code-block" style={{fontSize: '0.7rem'}}>0x1cd9013a3a4deb16158293a549fa554515eb6be71402d5486baf0727b35b442e</pre>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">4</div>
+              <div>
+                <strong>Открой сайт в браузере</strong>
+                <span className="hint">
+                  На телефоне открой <a href="https://token-landing-seven.vercel.app" target="_blank">token-landing-seven.vercel.app</a><br />
+                  В MetaMask (моб.) → встроенный браузер (☰ → Browser)<br />
+                  Или просто открой в Safari/Chrome → Connect Wallet<br />
+                  Нажми 🚀 Настройка кошелька — пройди 4 шага
+                </span>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">5</div>
+              <div>
+                <strong>Добавь DMUSDT в кошелек</strong>
+                <span className="hint">
+                  Не открывая сайт — в MetaMask (моб.):<br />
+                  Нажми на три точки → Import Tokens →<br />
+                  Address: <code>0x6F765509c7D319b5760392dFf927557EF90d319C</code><br />
+                  Symbol: DMUSDT &nbsp; Decimals: 18 → Import
+                </span>
+              </div>
+            </div>
+
+            <div className="step">
+              <div className="step-num">6</div>
+              <div>
+                <strong>Готово!</strong>
+                <ul className="feature-list">
+                  <li>🪙 Mint — получи 1000 DMUSDT</li>
+                  <li>✈️ Send — отправь другу через моб. MetaMask</li>
+                  <li>📲 Работает на любом устройстве</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
       {/* Footer */}
