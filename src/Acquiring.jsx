@@ -12,21 +12,16 @@ const TOKEN_ABI = [
 ]
 
 const PRODUCTS = [
-  { id: 1, name: '🎧 Наушники', price: 50, emoji: '🎧' },
-  { id: 2, name: '👟 Кроссовки', price: 120, emoji: '👟' },
-  { id: 3, name: '⌚ Часы', price: 250, emoji: '⌚' },
-  { id: 4, name: '📱 Чехол', price: 15, emoji: '📱' },
+  { id: 1, name: '🎧 Наушники', price: 50 },
+  { id: 2, name: '👟 Кроссовки', price: 120 },
+  { id: 3, name: '⌚ Часы', price: 250 },
+  { id: 4, name: '📱 Чехол', price: 15 },
 ]
-
-const MERCHANT_ADDRESS_LABEL = `${MERCHANT_ADDR.slice(0, 6)}...${MERCHANT_ADDR.slice(-4)}`
 
 export default function Acquiring({ onBack }) {
   const [logs, setLogs] = useState([])
   const [merchantBalance, setMerchantBalance] = useState(null)
-  const [selectedProduct, setSelectedProduct] = useState(null)
-  const [status, setStatus] = useState('waiting') // waiting | pending | confirmed | error
-  const [paymentTx, setPaymentTx] = useState(null)
-  const prevBalanceRef = useRef(null)
+  const [modal, setModal] = useState(null) // { product, status, txHash, paymentId }
   const logsEndRef = useRef(null)
   const intervalRef = useRef(null)
 
@@ -39,163 +34,129 @@ export default function Acquiring({ onBack }) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  // Загрузка начального баланса мерчанта
-  const fetchMerchantBalance = useCallback(async () => {
+  const fetchBalance = useCallback(async () => {
     try {
       const provider = new JsonRpcProvider(RPC_URL)
       const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, provider)
       const bal = await contract.balanceOf(MERCHANT_ADDR)
       const formatted = formatEther(bal)
       setMerchantBalance(formatted)
-      prevBalanceRef.current = bal
       return bal
-    } catch (e) {
-      return null
-    }
+    } catch { return null }
   }, [])
 
-  // Старт отслеживания оплаты
-  const startPayment = async (product) => {
-    setSelectedProduct(product)
-    setPaymentTx(null)
-    setStatus('pending')
+  // Загружаем баланс при монтировании
+  useEffect(() => { fetchBalance() }, [fetchBalance])
+
+  const openPayment = async (product) => {
+    const paymentId = `PAY-${Date.now().toString(36).toUpperCase()}`
+    setModal({ product, status: 'pending', paymentId })
+
+    addLog('info', `🆕 Платеж #${paymentId}`)
+    addLog('info', `🟢 Товар: ${product.name} | Сумма: ${product.price} DMUSDT`)
+    addLog('info', `🏦 Кошелек мерчанта: ${MERCHANT_ADDR.slice(0,6)}...${MERCHANT_ADDR.slice(-4)}`)
 
     const provider = new JsonRpcProvider(RPC_URL)
     const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, provider)
 
-    const before = await fetchMerchantBalance()
-    addLog('info', `🟢 Запрос на оплату: ${product.name} — ${product.price} DMUSDT`)
-    addLog('info', `🏦 Адрес мерчанта: ${MERCHANT_ADDRESS_LABEL}`)
-    addLog('info', `💰 Баланс мерчанта до: ${Number(before).toFixed(2)} DMUSDT`)
-    addLog('pending', `⏳ Ожидаем перевод ${product.price} DMUSDT на адрес мерчанта...`)
-    addLog('info', `📋 Отправь DMUSDT через MetaMask на адрес ниже`)
+    const before = await contract.balanceOf(MERCHANT_ADDR)
+    const targetWei = BigInt(product.price) * 10n ** 18n
+    addLog('pending', `⏳ Баланс мерчанта до: ${Number(formatEther(before)).toFixed(2)} DMUSDT`)
+    addLog('pending', `⏳ Ожидаем перевод ${product.price} DMUSDT...`)
 
-    // Опрос баланса каждые 3 секунды
-    const targetWei = product.price * 10n ** 18n
+    // Опрос каждые 2 сек
+    let pollCount = 0
     intervalRef.current = setInterval(async () => {
+      pollCount++
       try {
         const current = await contract.balanceOf(MERCHANT_ADDR)
         const diff = current - before
 
         if (diff >= targetWei) {
           clearInterval(intervalRef.current)
-          setStatus('confirmed')
-          setMerchantBalance(formatEther(current))
 
-          // Ищем транзакцию Transfer в последних блоках
+          // Ищем Transfer event
+          let txHash = ''
           try {
             const block = await provider.getBlockNumber()
             const events = await contract.queryFilter(
               contract.filters.Transfer(null, MERCHANT_ADDR),
-              block - 20,
+              block - 30,
               'latest'
             )
-            const match = events.find(e => e.args.value >= targetWei)
-            if (match) {
-              setPaymentTx(match.transactionHash)
-            }
+            const match = events.find(e => e.args.value >= targetWei &&
+              Number(e.args.value) / 10**18 === product.price)
+            if (match) txHash = match.transactionHash
           } catch {}
 
-          addLog('success', `✅ Платёж получен! +${Number(formatEther(diff)).toFixed(2)} DMUSDT`)
+          setModal({ product, status: 'confirmed', paymentId, txHash })
+          setMerchantBalance(formatEther(current))
+          addLog('success', `✅ Платеж #${paymentId} получен! ${product.price} DMUSDT`)
           addLog('success', `💰 Баланс мерчанта: ${Number(formatEther(current)).toFixed(2)} DMUSDT`)
-          addLog('info', '📊 Транзакция завершена успешно')
+          if (txHash) addLog('info', `🔗 TX: ${txHash.slice(0,10)}...${txHash.slice(-6)}`)
+        } else if (pollCount > 60) {
+          // 2 минуты прошло — таймаут
+          clearInterval(intervalRef.current)
+          setModal({ product, status: 'error', paymentId })
+          addLog('error', `❌ Таймаут платежа #${paymentId}`)
         }
       } catch {}
-    }, 3000)
+    }, 2000)
   }
 
-  // Остановка отслеживания при уходе
-  useEffect(() => {
-    return () => clearInterval(intervalRef.current)
-  }, [])
+  const closeModal = () => {
+    setModal(null)
+    clearInterval(intervalRef.current)
+  }
 
   return (
     <div className="acquiring">
       <header className="aq-header">
         <button className="btn btn-secondary aq-back" onClick={onBack}>← Назад</button>
         <h1>🧪 Тестовый эквайринг DMUSDT</h1>
-        <p className="aq-subtitle">Отправь DMUSDT на адрес мерчанта — система сама обнаружит платеж</p>
+        <p className="aq-subtitle">Нажми "Оплатить" — получи адрес и сумму для перевода. Система сама найдет платеж</p>
       </header>
 
       <div className="aq-split">
-        {/* Левая панель: магазин + адрес */}
+        {/* Левая панель */}
         <div className="aq-store">
-          {/* Адрес для перевода */}
-          <div className="aq-card aq-address-card">
-            <h2>📤 Отправить DMUSDT на адрес</h2>
-            <div className="aq-address-block">
-              <code className="aq-address">{MERCHANT_ADDR}</code>
-              <button className="btn btn-small btn-primary" onClick={() => {
-                navigator.clipboard.writeText(MERCHANT_ADDR)
-                addLog('info', '📋 Адрес мерчанта скопирован')
-              }}>
-                📋 Копировать
-              </button>
-            </div>
-            <p className="aq-address-hint">
-              Открой MetaMask → Send → вставь этот адрес → отправь нужное количество DMUSDT
-            </p>
-            <div className="aq-merchant-balance">
-              <span>🏦 Баланс мерчанта:</span>
-              <span className="aq-balance-big">{merchantBalance !== null ? Number(merchantBalance).toFixed(2) : <span className="spinner-sm" />} DMUSDT</span>
-              <button className="btn btn-small btn-secondary" onClick={() => {
-                fetchMerchantBalance()
-                addLog('info', '🔄 Баланс обновлен')
-              }}>
-                Обновить
-              </button>
-            </div>
-          </div>
-
-          {/* Товары */}
           <div className="aq-card">
             <h2>🏪 Товары</h2>
-            <p className="aq-products-hint">Выбери товар — скопируй сумму для отправки</p>
             <div className="aq-products">
               {PRODUCTS.map(p => (
-                <div key={p.id} className={`aq-product ${selectedProduct?.id === p.id ? 'selected' : ''}`}>
+                <div key={p.id} className="aq-product">
                   <div className="aq-product-info">
-                    <span className="aq-product-name">{p.emoji} {p.name}</span>
+                    <span className="aq-product-name">{p.name}</span>
                     <span className="aq-product-price">{p.price} DMUSDT</span>
                   </div>
-                  <div className="aq-product-actions">
-                    <button
-                      className="btn btn-accent btn-sm"
-                      onClick={() => startPayment(p)}
-                      disabled={status === 'pending'}
-                    >
-                      {status === 'pending' && selectedProduct?.id === p.id ? '⏳...' : 'Оплатить'}
-                    </button>
-                  </div>
+                  <button className="btn btn-accent btn-sm" onClick={() => openPayment(p)}>
+                    Оплатить
+                  </button>
                 </div>
               ))}
             </div>
+          </div>
 
-            {status === 'pending' && (
-              <div className="aq-paying">
-                <div className="spinner"></div>
-                <span>Ожидание перевода на адрес мерчанта...</span>
+          <div className="aq-card">
+            <h2>🏦 Мерчант</h2>
+            <div className="aq-merchant-info">
+              <div className="aq-merchant-row">
+                <span>Адрес:</span>
+                <code className="aq-merchant-code">{MERCHANT_ADDR.slice(0,10)}...{MERCHANT_ADDR.slice(-8)}</code>
+                <button className="btn btn-small btn-secondary" onClick={() => {
+                  navigator.clipboard.writeText(MERCHANT_ADDR)
+                  addLog('info', '📋 Адрес скопирован')
+                }}>📋</button>
               </div>
-            )}
-
-            {status === 'confirmed' && (
-              <div className="aq-confirmed">
-                <span className="aq-check">✅</span>
-                <div>
-                  <strong>Платёж подтверждён!</strong>
-                  {paymentTx && (
-                    <a
-                      href={`https://sepolia.etherscan.io/tx/${paymentTx}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="aq-tx-link"
-                    >
-                      Посмотреть в Etherscan ↗
-                    </a>
-                  )}
-                </div>
+              <div className="aq-merchant-row">
+                <span>Баланс:</span>
+                <span className="aq-balance">{merchantBalance !== null ? Number(merchantBalance).toFixed(2) : '...'} DMUSDT</span>
+                <button className="btn btn-small btn-secondary" onClick={() => {
+                  fetchBalance()
+                  addLog('info', '🔄 Баланс обновлен')
+                }}>🔄</button>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -206,8 +167,8 @@ export default function Acquiring({ onBack }) {
             <div className="aq-logs">
               {logs.length === 0 ? (
                 <div className="aq-logs-empty">
-                  <p>Нажми "Оплатить" на любом товаре</p>
-                  <p className="aq-hint">Система будет отслеживать перевод на адрес мерчанта</p>
+                  <p>Нажми "Оплатить" на товаре</p>
+                  <p className="aq-hint">Система сгенерирует платеж и будет отслеживать перевод</p>
                 </div>
               ) : (
                 logs.map((log, i) => (
@@ -222,12 +183,104 @@ export default function Acquiring({ onBack }) {
           </div>
 
           <div className="aq-info">
-            <p>🔗 <strong>Контракт:</strong> <code>{CONTRACT_ADDR.slice(0,10)}...{CONTRACT_ADDR.slice(-6)}</code></p>
-            <p>🏦 <strong>Мерчант:</strong> <code>{MERCHANT_ADDRESS_LABEL}</code></p>
-            <p>🌐 <strong>Сеть:</strong> Sepolia (Chain ID: 11155111)</p>
+            <p>🔗 <strong>Контракт:</strong> <code>{CONTRACT_ADDR.slice(0,14)}...{CONTRACT_ADDR.slice(-4)}</code></p>
+            <p>🌐 <strong>Сеть:</strong> Sepolia (11155111)</p>
           </div>
         </div>
       </div>
+
+      {/* Модалка оплаты */}
+      {modal && (
+        <div className="aq-modal-overlay" onClick={() => modal.status !== 'pending' && closeModal()}>
+          <div className="aq-modal" onClick={e => e.stopPropagation()}>
+            {modal.status === 'pending' && (
+              <>
+                <div className="aq-modal-spinner">
+                  <div className="spinner-lg"></div>
+                </div>
+                <h2>⏳ Ожидание платежа</h2>
+                <div className="aq-modal-details">
+                  <div className="aq-modal-row">
+                    <span>Платеж</span>
+                    <strong>{modal.paymentId}</strong>
+                  </div>
+                  <div className="aq-modal-row">
+                    <span>Товар</span>
+                    <strong>{modal.product.name}</strong>
+                  </div>
+                  <div className="aq-modal-row">
+                    <span>Сумма</span>
+                    <strong className="aq-modal-price">{modal.product.price} DMUSDT</strong>
+                  </div>
+                  <div className="aq-modal-row">
+                    <span>Адрес</span>
+                    <code className="aq-modal-addr">{MERCHANT_ADDR}</code>
+                  </div>
+                </div>
+                <button className="aq-modal-copy" onClick={() => {
+                  navigator.clipboard.writeText(MERCHANT_ADDR)
+                  addLog('info', '📋 Адрес скопирован из модалки')
+                }}>
+                  📋 Копировать адрес
+                </button>
+                <p className="aq-modal-hint">
+                  1. Открой MetaMask → Send<br />
+                  2. Вставь адрес сверху<br />
+                  3. Введи сумму: <strong>{modal.product.price} DMUSDT</strong><br />
+                  4. Подтверди транзакцию
+                </p>
+                <button className="btn btn-secondary" onClick={closeModal}>Отмена</button>
+              </>
+            )}
+
+            {modal.status === 'confirmed' && (
+              <>
+                <div className="aq-modal-icon">✅</div>
+                <h2>Платёж подтверждён!</h2>
+                <div className="aq-modal-details">
+                  <div className="aq-modal-row">
+                    <span>Платеж</span>
+                    <strong>{modal.paymentId}</strong>
+                  </div>
+                  <div className="aq-modal-row">
+                    <span>Товар</span>
+                    <strong>{modal.product.name}</strong>
+                  </div>
+                  <div className="aq-modal-row">
+                    <span>Сумма</span>
+                    <strong className="aq-modal-price">{modal.product.price} DMUSDT</strong>
+                  </div>
+                  {modal.txHash && (
+                    <div className="aq-modal-row">
+                      <span>TX</span>
+                      <a href={`https://sepolia.etherscan.io/tx/${modal.txHash}`}
+                         target="_blank" rel="noreferrer" className="aq-modal-tx">
+                        {modal.txHash.slice(0,10)}... ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <button className="btn btn-primary" onClick={closeModal}>Готово</button>
+              </>
+            )}
+
+            {modal.status === 'error' && (
+              <>
+                <div className="aq-modal-icon">❌</div>
+                <h2>Таймаут платежа</h2>
+                <p className="aq-modal-fail">Перевод не обнаружен в течение 2 минут</p>
+                <button className="btn btn-primary" onClick={() => {
+                  closeModal()
+                  openPayment(modal.product)
+                }}>
+                  Попробовать снова
+                </button>
+                <button className="btn btn-secondary" style={{marginTop: 8}} onClick={closeModal}>Закрыть</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
