@@ -353,6 +353,47 @@ export default function App() {
     }
   }
 
+  // Claim ETH (только пополнение, без минта)
+  const claimEth = async () => {
+    if (!account) {
+      setTxStatus('⚠️ Сначала подключи кошелек')
+      return
+    }
+    try {
+      setLoading(true)
+      setTxStatus(null)
+      startProgress('claim')
+
+      setTxStatus('⏳ Отправляем Sepolia ETH...')
+      const resp = await fetch('/api/claim-eth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: account }),
+      })
+
+      const data = await resp.json()
+
+      if (!resp.ok) {
+        throw new Error(data.error || 'Сервер временно недоступен')
+      }
+
+      setTxStatus(`✅ Получено ${data.amount} SepoliaETH!`)
+
+      if (provider) {
+        const eth = await provider.getBalance(account)
+        setEthBalance(formatEther(eth))
+      }
+
+      completeProgress()
+    } catch (err) {
+      console.error(err)
+      setTxStatus(friendlyError(err))
+      failProgress()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Обновление баланса по таймеру
   useEffect(() => {
     if (!contract || !account) return
@@ -440,15 +481,28 @@ export default function App() {
           {/* Token Info & Actions */}
           {contract ? (
             <>
-              {/* CLAIM & MINT — бесплатно */}
-              <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
-                <h2>🚀 Claim & Mint</h2>
-                <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
-                <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
-                  {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
-                </button>
-                {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
-              </section>
+              {/* CLAIM — показываем только если ETH мало или нет */}
+              {(!ethBalance || Number(ethBalance) < 0.003) && (
+                Number(ethBalance) === 0 || !ethBalance ? (
+                  <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '2px solid #00e676'}}>
+                    <h2>🚀 Claim ETH + Mint</h2>
+                    <p className="desc">Получи Sepolia ETH + 1000 DMUSDT за один клик. Газ оплачен 🎁</p>
+                    <button className="btn btn-accent" onClick={claimAndMint} disabled={loading}>
+                      {loading ? '⏳' : '🚀 Claim ETH + Mint 1000 DMUSDT'}
+                    </button>
+                    {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                  </section>
+                ) : (
+                  <section className={`card action-card ${activeAction === 'claim' ? 'card-active' : ''}`} style={{border: '1px solid #ffa726'}}>
+                    <h2>⛽ Claim Sepolia ETH</h2>
+                    <p className="desc">На балансе мало ETH для газа. Пополни бесплатно</p>
+                    <button className="btn btn-accent" onClick={claimEth} disabled={loading}>
+                      {loading ? '⏳' : '⛽ Claim 0.02 SepoliaETH'}
+                    </button>
+                    {loading && currentStage && activeAction === 'claim' && <ProgressBar stages={TX_STAGES} stageIndex={stageIndex} />}
+                  </section>
+                )
+              )}
 
               {/* MINT (для тех у кого уже есть ETH) */}
               <section className={`card action-card ${activeAction === 'mint' ? 'card-active' : ''}`}>
