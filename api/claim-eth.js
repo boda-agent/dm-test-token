@@ -1,6 +1,6 @@
 import { JsonRpcProvider, Wallet, parseEther } from 'ethers'
 
-const PRIVATE_KEY = proces…_KEY
+const PRIVATE_KEY = process.env.SPONSOR_PRIVATE_KEY
 const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka'
 
 export default async function handler(req, res) {

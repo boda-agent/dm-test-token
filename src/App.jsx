@@ -581,9 +581,11 @@ export default function App() {
                         {setupStep === 2 && (
                           <button className="btn btn-small btn-primary" onClick={async () => {
                             try {
+                              const cAddr = await getContractAddress()
+                              if (!cAddr) throw new Error('Contract address not found')
                               await window.ethereum.request({
                                 method: 'wallet_watchAsset',
-                                params: { type: 'ERC20', options: { address: contractAddress, symbol: 'DMUSDT', decimals: 18 } },
+                                params: { type: 'ERC20', options: { address: cAddr, symbol: 'DMUSDT', decimals: 18 } },
                               })
                               setTxStatus('✅ DMUSDT добавлен в MetaMask!')
                               setSetupStep(3)
