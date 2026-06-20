@@ -12,18 +12,19 @@ const TOKEN_ABI = [
 ]
 
 const PRODUCTS = [
-  { id: 1, name: '🎧 Наушники', price: 50 },
-  { id: 2, name: '👟 Кроссовки', price: 120 },
-  { id: 3, name: '⌚ Часы', price: 250 },
-  { id: 4, name: '📱 Чехол', price: 15 },
+  { id: 1, name: '🎧 Наушники', price: 50, address: '0xA72C11A8D266058Aa025969367124a2025E2085D' },
+  { id: 2, name: '👟 Кроссовки', price: 120, address: '0xA72C11A8D266058Aa025969367124a2025E2085D' },
+  { id: 3, name: '⌚ Часы', price: 250, address: '0xA72C11A8D266058Aa025969367124a2025E2085D' },
+  { id: 4, name: '📱 Чехол', price: 15, address: '0xA72C11A8D266058Aa025969367124a2025E2085D' },
 ]
 
 export default function Acquiring({ onBack }) {
   const [logs, setLogs] = useState([])
   const [merchantBalance, setMerchantBalance] = useState(null)
-  const [modal, setModal] = useState(null) // { product, status, txHash, paymentId }
+  const [modal, setModal] = useState(null)
   const logsEndRef = useRef(null)
-  const intervalRef = useRef(null)
+  const pollRef = useRef(null)
+  const startBlockRef = useRef(null)
 
   const addLog = (type, msg) => {
     const time = new Date().toLocaleTimeString()
@@ -45,68 +46,74 @@ export default function Acquiring({ onBack }) {
     } catch { return null }
   }, [])
 
-  // Загружаем баланс при монтировании
   useEffect(() => { fetchBalance() }, [fetchBalance])
 
-  const openPayment = async (product) => {
+  // Открыть платеж
+  const openPayment = (product) => {
     const paymentId = `PAY-${Date.now().toString(36).toUpperCase()}`
-    setModal({ product, status: 'pending', paymentId })
+    setModal({ product, status: 'pending', paymentId, fromBlock: null })
 
     addLog('info', `🆕 Платеж #${paymentId}`)
     addLog('info', `🟢 Товар: ${product.name} | Сумма: ${product.price} DMUSDT`)
-    addLog('info', `🏦 Кошелек мерчанта: ${MERCHANT_ADDR.slice(0,6)}...${MERCHANT_ADDR.slice(-4)}`)
+    addLog('info', `🏦 Адрес: ${product.address.slice(0,6)}...${product.address.slice(-4)}`)
 
+    // Стартуем
+    startPolling(paymentId, product)
+  }
+
+  // Поиск Transfer events
+  const startPolling = async (paymentId, product) => {
     const provider = new JsonRpcProvider(RPC_URL)
     const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, provider)
+    const currentBlock = await provider.getBlockNumber()
+    startBlockRef.current = currentBlock
 
-    const before = await contract.balanceOf(MERCHANT_ADDR)
-    const targetWei = BigInt(product.price) * 10n ** 18n
-    addLog('pending', `⏳ Баланс мерчанта до: ${Number(formatEther(before)).toFixed(2)} DMUSDT`)
-    addLog('pending', `⏳ Ожидаем перевод ${product.price} DMUSDT...`)
+    const targetWei = product.price * 10n ** 18n
+    addLog('pending', `⏳ Поиск перевода ${product.price} DMUSDT на ${product.address.slice(0,6)}...`)
+    addLog('pending', `⏳ Стартовый блок: ${currentBlock}`)
 
-    // Опрос каждые 2 сек
-    let pollCount = 0
-    intervalRef.current = setInterval(async () => {
-      pollCount++
+    let attempts = 0
+    pollRef.current = setInterval(async () => {
+      attempts++
       try {
-        const current = await contract.balanceOf(MERCHANT_ADDR)
-        const diff = current - before
+        const events = await contract.queryFilter(
+          contract.filters.Transfer(null, product.address),
+          startBlockRef.current,
+          'latest'
+        )
 
-        if (diff >= targetWei) {
-          clearInterval(intervalRef.current)
+        for (const event of events) {
+          if (event.args.value >= targetWei) {
+            clearInterval(pollRef.current)
+            const from = event.args.from
+            const txHash = event.transactionHash
 
-          // Ищем Transfer event
-          let txHash = ''
-          try {
-            const block = await provider.getBlockNumber()
-            const events = await contract.queryFilter(
-              contract.filters.Transfer(null, MERCHANT_ADDR),
-              block - 30,
-              'latest'
-            )
-            const match = events.find(e => e.args.value >= targetWei &&
-              Number(e.args.value) / 10**18 === product.price)
-            if (match) txHash = match.transactionHash
-          } catch {}
+            addLog('success', `✅ Платеж #${paymentId} обнаружен!`)
+            addLog('success', `💰 Сумма: ${formatEther(event.args.value)} DMUSDT`)
+            addLog('success', `👤 Отправитель: ${from.slice(0,6)}...${from.slice(-4)}`)
+            addLog('info', `🔗 TX: ${txHash.slice(0,10)}...`)
+            addLog('info', `📊 Платеж подтвержден на блоке ${event.blockNumber}`)
 
-          setModal({ product, status: 'confirmed', paymentId, txHash })
-          setMerchantBalance(formatEther(current))
-          addLog('success', `✅ Платеж #${paymentId} получен! ${product.price} DMUSDT`)
-          addLog('success', `💰 Баланс мерчанта: ${Number(formatEther(current)).toFixed(2)} DMUSDT`)
-          if (txHash) addLog('info', `🔗 TX: ${txHash.slice(0,10)}...${txHash.slice(-6)}`)
-        } else if (pollCount > 60) {
-          // 2 минуты прошло — таймаут
-          clearInterval(intervalRef.current)
-          setModal({ product, status: 'error', paymentId })
-          addLog('error', `❌ Таймаут платежа #${paymentId}`)
+            setMerchantBalance(formatEther(await contract.balanceOf(MERCHANT_ADDR)))
+            setModal({ product, status: 'confirmed', paymentId, txHash })
+            return
+          }
         }
-      } catch {}
+      } catch (e) {
+        addLog('error', `❌ Ошибка поиска: ${e.message}`)
+      }
+
+      if (attempts > 90) {
+        clearInterval(pollRef.current)
+        setModal({ product, status: 'error', paymentId })
+        addLog('error', `❌ Таймаут платежа #${paymentId}`)
+      }
     }, 2000)
   }
 
   const closeModal = () => {
     setModal(null)
-    clearInterval(intervalRef.current)
+    clearInterval(pollRef.current)
   }
 
   return (
@@ -114,7 +121,7 @@ export default function Acquiring({ onBack }) {
       <header className="aq-header">
         <button className="btn btn-secondary aq-back" onClick={onBack}>← Назад</button>
         <h1>🧪 Тестовый эквайринг DMUSDT</h1>
-        <p className="aq-subtitle">Нажми "Оплатить" — получи адрес и сумму для перевода. Система сама найдет платеж</p>
+        <p className="aq-subtitle">Выбери товар, отправь DMUSDT на указанный адрес — система найдет платеж по Transfer event</p>
       </header>
 
       <div className="aq-split">
@@ -141,14 +148,6 @@ export default function Acquiring({ onBack }) {
             <h2>🏦 Мерчант</h2>
             <div className="aq-merchant-info">
               <div className="aq-merchant-row">
-                <span>Адрес:</span>
-                <code className="aq-merchant-code">{MERCHANT_ADDR.slice(0,10)}...{MERCHANT_ADDR.slice(-8)}</code>
-                <button className="btn btn-small btn-secondary" onClick={() => {
-                  navigator.clipboard.writeText(MERCHANT_ADDR)
-                  addLog('info', '📋 Адрес скопирован')
-                }}>📋</button>
-              </div>
-              <div className="aq-merchant-row">
                 <span>Баланс:</span>
                 <span className="aq-balance">{merchantBalance !== null ? Number(merchantBalance).toFixed(2) : '...'} DMUSDT</span>
                 <button className="btn btn-small btn-secondary" onClick={() => {
@@ -168,7 +167,7 @@ export default function Acquiring({ onBack }) {
               {logs.length === 0 ? (
                 <div className="aq-logs-empty">
                   <p>Нажми "Оплатить" на товаре</p>
-                  <p className="aq-hint">Система сгенерирует платеж и будет отслеживать перевод</p>
+                  <p className="aq-hint">Система будет отслеживать переводы через Transfer events</p>
                 </div>
               ) : (
                 logs.map((log, i) => (
@@ -183,13 +182,13 @@ export default function Acquiring({ onBack }) {
           </div>
 
           <div className="aq-info">
-            <p>🔗 <strong>Контракт:</strong> <code>{CONTRACT_ADDR.slice(0,14)}...{CONTRACT_ADDR.slice(-4)}</code></p>
+            <p>🔗 <strong>Контракт:</strong> <code>0x6F7655...d319C</code></p>
             <p>🌐 <strong>Сеть:</strong> Sepolia (11155111)</p>
           </div>
         </div>
       </div>
 
-      {/* Модалка оплаты */}
+      {/* Модалка */}
       {modal && (
         <div className="aq-modal-overlay" onClick={() => modal.status !== 'pending' && closeModal()}>
           <div className="aq-modal" onClick={e => e.stopPropagation()}>
@@ -214,11 +213,11 @@ export default function Acquiring({ onBack }) {
                   </div>
                   <div className="aq-modal-row">
                     <span>Адрес</span>
-                    <code className="aq-modal-addr">{MERCHANT_ADDR}</code>
+                    <code className="aq-modal-addr">{modal.product.address}</code>
                   </div>
                 </div>
                 <button className="aq-modal-copy" onClick={() => {
-                  navigator.clipboard.writeText(MERCHANT_ADDR)
+                  navigator.clipboard.writeText(modal.product.address)
                   addLog('info', '📋 Адрес скопирован из модалки')
                 }}>
                   📋 Копировать адрес
@@ -268,10 +267,11 @@ export default function Acquiring({ onBack }) {
               <>
                 <div className="aq-modal-icon">❌</div>
                 <h2>Таймаут платежа</h2>
-                <p className="aq-modal-fail">Перевод не обнаружен в течение 2 минут</p>
+                <p className="aq-modal-fail">Перевод не обнаружен в течение 3 минут</p>
                 <button className="btn btn-primary" onClick={() => {
+                  const p = modal.product
                   closeModal()
-                  openPayment(modal.product)
+                  setTimeout(() => openPayment(p), 100)
                 }}>
                   Попробовать снова
                 </button>
