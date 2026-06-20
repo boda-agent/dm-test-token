@@ -23,6 +23,34 @@ const NETWORK_CONFIG = {
   nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
 }
 
+// Человеко-читаемые ошибки
+const ERROR_MAP = {
+  'insufficient funds': '❌ Недостаточно Sepolia ETH на кошельке для газа',
+  'insufficient balance': '❌ Недостаточно DMUSDT токенов для отправки',
+  'user rejected': '⚠️ Транзакция отклонена в MetaMask',
+  'nonce too low': '❌ Ошибка nonce. Попробуй еще раз',
+  'execution reverted': '❌ Транзакция отклонена контрактом',
+  'ERC20InsufficientBalance': '❌ Недостаточно токенов для перевода',
+  'caller not owner': '❌ Только владелец контракта может вызвать эту функцию',
+  'network changed': '⚠️ Сеть изменилась. Переключись на Sepolia',
+  'already known': '⏳ Транзакция уже отправлена',
+  'replace underpriced': '⏳ Транзакция заменена более дорогой',
+  'Sponsor wallet': '❌ На спонсорском кошельке закончился ETH. Напиши @daniil_borisov5',
+  'timeout': '❌ Таймаут. Попробуй еще раз',
+  'fetch': '❌ Ошибка соединения. Проверь интернет',
+  'Internal JSON': '❌ Ошибка RPC. Попробуй позже',
+}
+
+function friendlyError(err) {
+  const msg = err?.message || err?.error || String(err)
+  for (const [key, val] of Object.entries(ERROR_MAP)) {
+    if (msg.toLowerCase().includes(key.toLowerCase())) return val
+  }
+  // Если не нашли — короткое сообщение без стека
+  const clean = msg.split('(')[0].split('[')[0].trim()
+  return '❌ ' + (clean.length > 80 ? clean.slice(0, 80) + '…' : clean)
+}
+
 export default function App() {
   const [page, setPage] = useState('main')
   const [provider, setProvider] = useState(null)
@@ -303,7 +331,7 @@ export default function App() {
       const data = await resp.json()
 
       if (!resp.ok) {
-        throw new Error(data.error || 'Ошибка сервера')
+        throw new Error(data.error || 'Сервер временно недоступен')
       }
 
       setTxStatus(`✅ Получено ${data.ethAmount} SepoliaETH + ${data.tokenAmount} DMUSDT!`)
@@ -318,7 +346,7 @@ export default function App() {
       completeProgress()
     } catch (err) {
       console.error(err)
-      setTxStatus('❌ ' + (err.message || err))
+      setTxStatus(friendlyError(err))
       failProgress()
     } finally {
       setLoading(false)
