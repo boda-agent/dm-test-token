@@ -1,17 +1,15 @@
-import { useState, useRef, useEffect } from 'react'
-import { BrowserProvider, Contract, formatEther, parseEther } from 'ethers'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { JsonRpcProvider, Contract, formatEther } from 'ethers'
 import './Acquiring.css'
+
+const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/MMdh1t3D_tgjOOkQK69Ka'
+const CONTRACT_ADDR = '0x6F765509c7D319b5760392dFf927557EF90d319C'
+const MERCHANT_ADDR = '0xA72C11A8D266058Aa025969367124a2025E2085D'
 
 const TOKEN_ABI = [
   'function balanceOf(address) view returns (uint256)',
-  'function transfer(address to, uint256 amount) returns (bool)',
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
-  'function tokenInfo() view returns (string name, string symbol, uint8 decimals)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
 ]
-
-const CONTRACT_ADDR = '0x6F765509c7D319b5760392dFf927557EF90d319C'
-const MERCHANT_ADDR = '0xA72C11A8D266058Aa025969367124a2025E2085D'
 
 const PRODUCTS = [
   { id: 1, name: '🎧 Наушники', price: 50, emoji: '🎧' },
@@ -20,15 +18,17 @@ const PRODUCTS = [
   { id: 4, name: '📱 Чехол', price: 15, emoji: '📱' },
 ]
 
+const MERCHANT_ADDRESS_LABEL = `${MERCHANT_ADDR.slice(0, 6)}...${MERCHANT_ADDR.slice(-4)}`
+
 export default function Acquiring({ onBack }) {
   const [logs, setLogs] = useState([])
-  const [account, setAccount] = useState(null)
-  const [signer, setSigner] = useState(null)
-  const [tokenBalance, setTokenBalance] = useState(null)
   const [merchantBalance, setMerchantBalance] = useState(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
-  const [loadingPay, setLoadingPay] = useState(false)
+  const [status, setStatus] = useState('waiting') // waiting | pending | confirmed | error
+  const [paymentTx, setPaymentTx] = useState(null)
+  const prevBalanceRef = useRef(null)
   const logsEndRef = useRef(null)
+  const intervalRef = useRef(null)
 
   const addLog = (type, msg) => {
     const time = new Date().toLocaleTimeString()
@@ -39,147 +39,175 @@ export default function Acquiring({ onBack }) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  const connect = async () => {
-    if (!window.ethereum) return addLog('error', 'MetaMask не установлен')
+  // Загрузка начального баланса мерчанта
+  const fetchMerchantBalance = useCallback(async () => {
     try {
-      await window.ethereum.request({ method: 'eth_requestAccounts' })
-      const provider = new BrowserProvider(window.ethereum)
-      const sign = await provider.getSigner()
-      const addr = await sign.getAddress()
-      setAccount(addr)
-      setSigner(sign)
-      addLog('success', `Кошелек подключен: ${addr.slice(0,6)}...${addr.slice(-4)}`)
-
+      const provider = new JsonRpcProvider(RPC_URL)
       const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, provider)
-      const bal = await contract.balanceOf(addr)
-      setTokenBalance(formatEther(bal))
-      addLog('info', `Баланс DMUSDT: ${formatEther(bal)}`)
-
-      const mBal = await contract.balanceOf(MERCHANT_ADDR)
-      setMerchantBalance(formatEther(mBal))
-      addLog('info', `Баланс мерчанта: ${formatEther(mBal)} DMUSDT`)
+      const bal = await contract.balanceOf(MERCHANT_ADDR)
+      const formatted = formatEther(bal)
+      setMerchantBalance(formatted)
+      prevBalanceRef.current = bal
+      return bal
     } catch (e) {
-      addLog('error', `Ошибка: ${e.message}`)
+      return null
     }
-  }
+  }, [])
 
-  const pay = async (product) => {
-    if (!account || !signer) return addLog('error', 'Сначала подключи кошелек')
-    setLoadingPay(true)
+  // Старт отслеживания оплаты
+  const startPayment = async (product) => {
     setSelectedProduct(product)
-    try {
-      const provider = new BrowserProvider(window.ethereum)
-      const sign = await provider.getSigner()
-      const priceWei = parseEther(String(product.price))
+    setPaymentTx(null)
+    setStatus('pending')
 
-      addLog('info', `🔵 Покупка: ${product.name} за ${product.price} DMUSDT`)
-      addLog('info', '🔵 Проверка баланса...')
+    const provider = new JsonRpcProvider(RPC_URL)
+    const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, provider)
 
-      const contract = new Contract(CONTRACT_ADDR, TOKEN_ABI, sign)
-      const bal = await contract.balanceOf(account)
-      addLog('info', `Баланс покупателя: ${formatEther(bal)} DMUSDT`)
+    const before = await fetchMerchantBalance()
+    addLog('info', `🟢 Запрос на оплату: ${product.name} — ${product.price} DMUSDT`)
+    addLog('info', `🏦 Адрес мерчанта: ${MERCHANT_ADDRESS_LABEL}`)
+    addLog('info', `💰 Баланс мерчанта до: ${Number(before).toFixed(2)} DMUSDT`)
+    addLog('pending', `⏳ Ожидаем перевод ${product.price} DMUSDT на адрес мерчанта...`)
+    addLog('info', `📋 Отправь DMUSDT через MetaMask на адрес ниже`)
 
-      if (bal < priceWei) {
-        addLog('error', `❌ Недостаточно DMUSDT (нужно ${product.price}, есть ${formatEther(bal)})`)
-        setLoadingPay(false)
-        return
-      }
+    // Опрос баланса каждые 3 секунды
+    const targetWei = product.price * 10n ** 18n
+    intervalRef.current = setInterval(async () => {
+      try {
+        const current = await contract.balanceOf(MERCHANT_ADDR)
+        const diff = current - before
 
-      addLog('info', '🔵 Одобрение токенов для перевода (approve)...')
-      const approveTx = await contract.approve(account, priceWei)
-      addLog('pending', `⏳ approve tx: ${approveTx.hash.slice(0,10)}...`)
-      await approveTx.wait()
-      addLog('success', `✅ approve подтвержден`)
+        if (diff >= targetWei) {
+          clearInterval(intervalRef.current)
+          setStatus('confirmed')
+          setMerchantBalance(formatEther(current))
 
-      addLog('info', '🔵 Отправка DMUSDT мерчанту...')
-      const tx = await contract.transfer(MERCHANT_ADDR, priceWei)
-      addLog('pending', `⏳ transfer tx: ${tx.hash.slice(0,10)}...`)
-      await tx.wait()
-      addLog('success', `✅ Оплата прошла! ${product.price} DMUSDT → мерчанту`)
+          // Ищем транзакцию Transfer в последних блоках
+          try {
+            const block = await provider.getBlockNumber()
+            const events = await contract.queryFilter(
+              contract.filters.Transfer(null, MERCHANT_ADDR),
+              block - 20,
+              'latest'
+            )
+            const match = events.find(e => e.args.value >= targetWei)
+            if (match) {
+              setPaymentTx(match.transactionHash)
+            }
+          } catch {}
 
-      const newBal = await contract.balanceOf(account)
-      setTokenBalance(formatEther(newBal))
-      const mBal = await contract.balanceOf(MERCHANT_ADDR)
-      setMerchantBalance(formatEther(mBal))
-
-      addLog('success', `💰 Остаток: ${formatEther(newBal)} DMUSDT`)
-      addLog('success', `💰 Мерчант: ${formatEther(mBal)} DMUSDT`)
-      addLog('info', '📊 Транзакция завершена')
-    } catch (e) {
-      addLog('error', `❌ Ошибка: ${e.message}`)
-    }
-    setLoadingPay(false)
+          addLog('success', `✅ Платёж получен! +${Number(formatEther(diff)).toFixed(2)} DMUSDT`)
+          addLog('success', `💰 Баланс мерчанта: ${Number(formatEther(current)).toFixed(2)} DMUSDT`)
+          addLog('info', '📊 Транзакция завершена успешно')
+        }
+      } catch {}
+    }, 3000)
   }
+
+  // Остановка отслеживания при уходе
+  useEffect(() => {
+    return () => clearInterval(intervalRef.current)
+  }, [])
 
   return (
     <div className="acquiring">
       <header className="aq-header">
         <button className="btn btn-secondary aq-back" onClick={onBack}>← Назад</button>
         <h1>🧪 Тестовый эквайринг DMUSDT</h1>
-        <p className="aq-subtitle">Симуляция покупки товара с оплатой в DMUSDT на Sepolia</p>
+        <p className="aq-subtitle">Отправь DMUSDT на адрес мерчанта — система сама обнаружит платеж</p>
       </header>
 
       <div className="aq-split">
-        {/* Левая панель: магазин */}
+        {/* Левая панель: магазин + адрес */}
         <div className="aq-store">
-          <div className="aq-card">
-            <h2>🏪 Магазин</h2>
-            {!account ? (
-              <div className="aq-connect">
-                <p>Подключи кошелек с DMUSDT для тестовой покупки</p>
-                <button className="btn btn-primary" onClick={connect}>🔌 Connect Wallet</button>
-              </div>
-            ) : (
-              <>
-                <div className="aq-wallet-info">
-                  <span>👤 {account.slice(0,6)}...{account.slice(-4)}</span>
-                  <span className="aq-balance">💰 {tokenBalance !== null ? Number(tokenBalance).toFixed(2) : '...'} DMUSDT</span>
-                </div>
-
-                <div className="aq-products">
-                  {PRODUCTS.map(p => (
-                    <div key={p.id} className={`aq-product ${selectedProduct?.id === p.id ? 'selected' : ''}`}>
-                      <div className="aq-product-info">
-                        <span className="aq-product-name">{p.emoji} {p.name}</span>
-                        <span className="aq-product-price">{p.price} DMUSDT</span>
-                      </div>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => pay(p)}
-                        disabled={loadingPay}
-                      >
-                        {loadingPay && selectedProduct?.id === p.id ? '⏳...' : 'Купить'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {selectedProduct && loadingPay && (
-                  <div className="aq-paying">
-                    <div className="spinner"></div>
-                    <span>Обработка платежа...</span>
-                  </div>
-                )}
-              </>
-            )}
+          {/* Адрес для перевода */}
+          <div className="aq-card aq-address-card">
+            <h2>📤 Отправить DMUSDT на адрес</h2>
+            <div className="aq-address-block">
+              <code className="aq-address">{MERCHANT_ADDR}</code>
+              <button className="btn btn-small btn-primary" onClick={() => {
+                navigator.clipboard.writeText(MERCHANT_ADDR)
+                addLog('info', '📋 Адрес мерчанта скопирован')
+              }}>
+                📋 Копировать
+              </button>
+            </div>
+            <p className="aq-address-hint">
+              Открой MetaMask → Send → вставь этот адрес → отправь нужное количество DMUSDT
+            </p>
+            <div className="aq-merchant-balance">
+              <span>🏦 Баланс мерчанта:</span>
+              <span className="aq-balance-big">{merchantBalance !== null ? Number(merchantBalance).toFixed(2) : <span className="spinner-sm" />} DMUSDT</span>
+              <button className="btn btn-small btn-secondary" onClick={() => {
+                fetchMerchantBalance()
+                addLog('info', '🔄 Баланс обновлен')
+              }}>
+                Обновить
+              </button>
+            </div>
           </div>
 
+          {/* Товары */}
           <div className="aq-card">
-            <h3>🏦 Мерчант</h3>
-            <p className="aq-merchant-addr">{MERCHANT_ADDR.slice(0,6)}...{MERCHANT_ADDR.slice(-4)}</p>
-            <p className="aq-balance">💰 {merchantBalance !== null ? Number(merchantBalance).toFixed(2) : '...'} DMUSDT</p>
+            <h2>🏪 Товары</h2>
+            <p className="aq-products-hint">Выбери товар — скопируй сумму для отправки</p>
+            <div className="aq-products">
+              {PRODUCTS.map(p => (
+                <div key={p.id} className={`aq-product ${selectedProduct?.id === p.id ? 'selected' : ''}`}>
+                  <div className="aq-product-info">
+                    <span className="aq-product-name">{p.emoji} {p.name}</span>
+                    <span className="aq-product-price">{p.price} DMUSDT</span>
+                  </div>
+                  <div className="aq-product-actions">
+                    <button
+                      className="btn btn-accent btn-sm"
+                      onClick={() => startPayment(p)}
+                      disabled={status === 'pending'}
+                    >
+                      {status === 'pending' && selectedProduct?.id === p.id ? '⏳...' : 'Оплатить'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {status === 'pending' && (
+              <div className="aq-paying">
+                <div className="spinner"></div>
+                <span>Ожидание перевода на адрес мерчанта...</span>
+              </div>
+            )}
+
+            {status === 'confirmed' && (
+              <div className="aq-confirmed">
+                <span className="aq-check">✅</span>
+                <div>
+                  <strong>Платёж подтверждён!</strong>
+                  {paymentTx && (
+                    <a
+                      href={`https://sepolia.etherscan.io/tx/${paymentTx}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="aq-tx-link"
+                    >
+                      Посмотреть в Etherscan ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Правая панель: логи эквайринга */}
+        {/* Правая панель: логи */}
         <div className="aq-logs-panel">
           <div className="aq-card aq-logs-card">
             <h2>📋 Логи эквайринга</h2>
             <div className="aq-logs">
               {logs.length === 0 ? (
                 <div className="aq-logs-empty">
-                  <p>Подключи кошелек и соверши покупку</p>
-                  <p className="aq-hint">Здесь будут отображаться все события транзакции</p>
+                  <p>Нажми "Оплатить" на любом товаре</p>
+                  <p className="aq-hint">Система будет отслеживать перевод на адрес мерчанта</p>
                 </div>
               ) : (
                 logs.map((log, i) => (
@@ -195,6 +223,7 @@ export default function Acquiring({ onBack }) {
 
           <div className="aq-info">
             <p>🔗 <strong>Контракт:</strong> <code>{CONTRACT_ADDR.slice(0,10)}...{CONTRACT_ADDR.slice(-6)}</code></p>
+            <p>🏦 <strong>Мерчант:</strong> <code>{MERCHANT_ADDRESS_LABEL}</code></p>
             <p>🌐 <strong>Сеть:</strong> Sepolia (Chain ID: 11155111)</p>
           </div>
         </div>

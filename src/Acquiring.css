@@ -62,6 +62,105 @@
   margin-bottom: 8px;
 }
 
+.aq-address-card {
+  border-color: #00bcd4;
+}
+
+.aq-address-block {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.aq-address {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #00e676;
+  background: #0d0d14;
+  padding: 10px 12px;
+  border-radius: 8px;
+  word-break: break-all;
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.aq-address-hint {
+  color: #666;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+
+.aq-merchant-balance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #0d0d14;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #aaa;
+  flex-wrap: wrap;
+}
+
+.aq-balance-big {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #00e676;
+}
+
+.aq-products-hint {
+  color: #666;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+}
+
+.aq-product-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.aq-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  border-radius: 10px;
+}
+
+.aq-check {
+  font-size: 1.5rem;
+}
+
+.aq-confirmed strong {
+  display: block;
+  color: #00e676;
+  font-size: 0.95rem;
+}
+
+.aq-tx-link {
+  color: #00bcd4;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #2a2a3a;
+  border-top: 2px solid #00e676;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
 .aq-connect {
   text-align: center;
   padding: 30px 0;
