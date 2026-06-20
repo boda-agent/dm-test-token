@@ -1,0 +1,265 @@
+.acquiring {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.aq-header {
+  margin-bottom: 24px;
+}
+
+.aq-back {
+  margin-bottom: 12px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
+.aq-header h1 {
+  font-size: 1.5rem;
+  color: #e0e0e0;
+}
+
+.aq-subtitle {
+  color: #888;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.aq-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .aq-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aq-card {
+  background: #13131a;
+  border: 1px solid #1e1e2a;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.aq-card h2 {
+  font-size: 1.1rem;
+  color: #e0e0e0;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1e1e2a;
+}
+
+.aq-card h3 {
+  font-size: 0.95rem;
+  color: #ccc;
+  margin-bottom: 8px;
+}
+
+.aq-connect {
+  text-align: center;
+  padding: 30px 0;
+}
+
+.aq-connect p {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.aq-wallet-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #0d0d14;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 16px;
+}
+
+.aq-balance {
+  color: #00e676;
+  font-weight: 600;
+}
+
+.aq-products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aq-product {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #0d0d14;
+  border: 1px solid #1e1e2a;
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+
+.aq-product.selected {
+  border-color: #00bcd4;
+}
+
+.aq-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aq-product-name {
+  font-size: 0.9rem;
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.aq-product-price {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.btn-sm {
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+}
+
+.aq-paying {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #0d0d14;
+  border-radius: 8px;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.aq-merchant-addr {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #777;
+  margin-bottom: 4px;
+}
+
+/* Логи */
+.aq-logs-card {
+  height: 100%;
+}
+
+.aq-logs {
+  max-height: 500px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a3a transparent;
+}
+
+.aq-logs-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: #555;
+}
+
+.aq-logs-empty p {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.aq-hint {
+  font-size: 0.8rem;
+  color: #444;
+}
+
+.aq-log {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: 'Courier New', monospace;
+  align-items: flex-start;
+}
+
+.aq-log-time {
+  color: #555;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  min-width: 60px;
+}
+
+.aq-log-msg {
+  color: #aaa;
+  word-break: break-word;
+}
+
+.aq-log-success {
+  background: rgba(0, 230, 118, 0.05);
+}
+
+.aq-log-success .aq-log-msg {
+  color: #00e676;
+}
+
+.aq-log-error {
+  background: rgba(255, 80, 80, 0.05);
+}
+
+.aq-log-error .aq-log-msg {
+  color: #ff5252;
+}
+
+.aq-log-pending {
+  background: rgba(0, 188, 212, 0.05);
+}
+
+.aq-log-pending .aq-log-msg {
+  color: #00bcd4;
+}
+
+.aq-log-info {
+  background: transparent;
+}
+
+.aq-info {
+  padding: 12px 16px;
+  background: #0d0d14;
+  border: 1px solid #1e1e2a;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.aq-info p {
+  margin-bottom: 4px;
+}
+
+.aq-info code {
+  color: #00bcd4;
+  font-size: 0.75rem;
+}
+
+/* Scrollbar */
+.aq-logs::-webkit-scrollbar {
+  width: 4px;
+}
+.aq-logs::-webkit-scrollbar-track {
+  background: transparent;
+}
+.aq-logs::-webkit-scrollbar-thumb {
+  background: #2a2a3a;
+  border-radius: 4px;
+}

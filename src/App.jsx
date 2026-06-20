@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { BrowserProvider, Contract, formatEther, parseEther, JsonRpcSigner } from 'ethers'
 import './App.css'
 import Docs from './Docs.jsx'
+import Acquiring from './Acquiring.jsx'
 
 // ABI для DMUSDT
 const TOKEN_ABI = [
@@ -439,8 +440,11 @@ export default function App() {
 
   const shortAddr = account ? `${account.slice(0, 6)}...${account.slice(-4)}` : ''
 
-  if (page !== 'main') {
+  if (page === 'docs') {
     return <Docs onBack={() => setPage('main')} />
+  }
+  if (page === 'acquiring') {
+    return <Acquiring onBack={() => setPage('main')} />
   }
 
   return (
@@ -452,6 +456,9 @@ export default function App() {
         <p className="subtitle">Mint, Send & Add to MetaMask</p>
         <button className="btn btn-docs" onClick={() => setPage('docs')}>
           📄 Документация
+        </button>
+        <button className="btn btn-docs" onClick={() => setPage('acquiring')}>
+          🧪 Тест эквайринга
         </button>
       </header>
 
