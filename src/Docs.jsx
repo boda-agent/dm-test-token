@@ -8,8 +8,8 @@ export default function Docs({ onBack }) {
           ← Назад
         </button>
         <div>
-          <h1>📄 Интеграция DMUSDT для тестового эквайринга</h1>
-          <p className="docs-subtitle">Подключение тестовых оплат через DMUSDT на Sepolia testnet</p>
+          <h1>📄 Документация DMUSDT</h1>
+          <p className="docs-subtitle">Тестовый ERC20 токен на Sepolia testnet</p>
         </div>
       </header>
 
@@ -17,7 +17,7 @@ export default function Docs({ onBack }) {
       <section className="docs-section">
         <h2>🔍 Что это?</h2>
         <p><strong>DMUSDT</strong> — тестовый ERC20 токен на сети <strong>Sepolia</strong> (Ethereum testnet).</p>
-        <p>Предназначен для симуляции платежей в USDT при разработке и тестировании эквайринга, платежных шлюзов и кошельков.</p>
+        <p>Предназначен для симуляции платежей в USDT при разработке и тестировании платежных шлюзов и кошельков.</p>
         <div className="docs-highlight">
           <strong>Адрес контракта:</strong> <code>0x6F765509c7D319b5760392dFf927557EF90d319C</code>
         </div>
